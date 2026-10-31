@@ -1,4 +1,4 @@
-import {env} from 'cloudflare:workers';
+import {env,waitUntil} from 'cloudflare:workers';
 import {pushLeadToZoho} from '../../../lib/zoho';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
@@ -51,8 +51,12 @@ export async function POST(req:Request){
     const id=crypto.randomUUID();
     const iso=new Date().toISOString();
     await db().prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,1)').bind(id,'lead-public','Leads','New',JSON.stringify(data),iso,iso).run();
-    const syncedToZoho=await pushLeadToZoho(data);
-    if(syncedToZoho)await db().prepare("UPDATE records SET data=json_set(data,'$.zohoSynced',1) WHERE id=?").bind(id).run();
+    waitUntil((async()=>{
+      try{
+        const syncedToZoho=await pushLeadToZoho(data);
+        if(syncedToZoho)await db().prepare("UPDATE records SET data=json_set(data,'$.zohoSynced',1) WHERE id=?").bind(id).run();
+      }catch{}
+    })());
 
     return json({ok:true,code:accessCode});
   }catch(e:any){return json({error:e.message||'Unable to submit your application'},e.status||400)}
