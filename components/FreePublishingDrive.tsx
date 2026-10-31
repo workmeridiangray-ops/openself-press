@@ -112,10 +112,23 @@ export default function FreePublishingDrive(){
     <p className="lead">Finishing a manuscript is hard enough without wondering how you'll ever afford to publish it. For the next 100 writers who apply, we're taking that question off the table completely — no publishing fee, no hidden cost, no catch. Just your story, made real.</p>
 
     <div className="three-col" style={{margin:'28px 0 40px'}}>
-      <article className="journey-card"><Sparkles size={25}/><h3>Nothing to pay</h3><p>The cost of publishing your book is ours to carry, not yours — from edit to finished copy.</p></article>
+      <article className="journey-card"><Sparkles size={25}/><h3>Nothing to pay</h3><p>Printing, ISBN, barcode and distribution — the cost is ours to carry, not yours.</p></article>
       <article className="journey-card"><BookOpen size={25}/><h3>It stays yours</h3><p>Your name on the cover, your rights in your hands, your royalties in your account.</p></article>
-      <article className="journey-card"><ShieldCheck size={25}/><h3>Done properly</h3><p>Real editing, real cover design, a real print and ebook release — not a shortcut.</p></article>
+      <article className="journey-card"><ShieldCheck size={25}/><h3>Printed and listed, free</h3><p>Free ISBN, free barcode, and your book properly distributed as a paperback and ebook — no publishing cost to you.</p></article>
     </div>
+
+    <section className="public-faq" style={{marginBottom:40}}>
+      <h2>How this actually works</h2>
+      {[
+        ['Is distribution really free?','Yes. There is no cost to you for printing, ISBN, barcode or distribution. This program covers all of it.'],
+        ['Where will my book actually be available?','As a paperback, in India and in most countries worldwide. As an ebook, everywhere — including Google Play Books and Amazon Kindle. Within India, your book also goes up on Amazon and Flipkart, alongside our own website.'],
+        ['Do I get my own author page?',"Yes — a shareable author page of your own, which you'll be able to manage yourself from your author studio once that feature opens."],
+        ['Can people buy directly from Open Shelf Press?','Yes. Readers can order both the paperback and the ebook straight from our website, same as any other listed title.'],
+        ['How long does publishing actually take?',"Typically 7 to 15 days, depending on how many applications we're processing at the time."],
+        ['What about the postcards, bookmarks or other extras I chose?','Whatever you selected in your application is packed and delivered together with your book.'],
+        ['Do you edit, design my cover, or proofread my manuscript?','No — this free program does not include editing, cover design or proofreading. We check only that your uploaded PDF is correctly sized and nothing is cut into the bleed. We add the barcode to your cover and assign your ISBN at no charge. If you want editing, design or proofreading support, those are separate paid services — check Author services on our website or contact us directly.'],
+      ].map(([q,a])=><details key={q}><summary>{q}</summary><p>{a}</p></details>)}
+    </section>
 
     <ol className="journey-progress" style={{gridTemplateColumns:'repeat(6,1fr)'}}>
       {STEP_LABELS.map((label,i)=><li key={label} className={i===step?'active':i<step?'done':''}><span>{i<step?<CheckCircle2 size={14}/>:i+1}</span>{label}</li>)}
