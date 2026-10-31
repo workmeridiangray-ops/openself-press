@@ -1,5 +1,5 @@
 'use client';
-import React,{useEffect,useState,useRef} from 'react';
+import React,{useEffect,useState,useRef} from 'react';import {useFormattedPrice} from '../lib/currency';
 import {BookOpen,ArrowUpRight,ArrowRight,ShoppingBag,Search,LayoutDashboard,FileText,Users,CheckCircle2,Truck,CreditCard,Settings,Bell,Plus,ChevronRight,Upload,Download,Menu,X,LogOut,ShieldCheck,PenLine,BarChart3,Mail,Library,Package,RefreshCw,Eye,Check,Clock,LifeBuoy} from 'lucide-react';
 import {books as sampleBooks,modules} from '../lib/catalogue';
 import MotionEnhancements from '../components/MotionEnhancements';
@@ -21,7 +21,6 @@ import ReviewQueue from '../components/ReviewQueue';
 import ManuscriptStudio from '../components/ManuscriptStudio';
 import OperationsWorkbench from '../components/OperationsWorkbench';
 import FreePublishingDrive from '../components/FreePublishingDrive';
-const money=(n:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(n);
 const slug=(s:string)=>s.toLowerCase().replaceAll(' ','-');
 const icons:any={Overview:LayoutDashboard,'My books':BookOpen,'Author copies':Package,Wallet:CreditCard,Marketing:Mail,Profile:Users,Referrals:Users,Credits:CreditCard,Achievements:ShieldCheck,Distribution:Truck,Invoices:FileText,Refunds:RefreshCw,Reviews:CheckCircle2,Submissions:FileText,Authors:Users,Publishing:BookOpen,Files:FileText,'Cover design':PenLine,ISBN:Library,Catalogue:Library,Orders:ShoppingBag,Production:Package,Shipping:Truck,Accounts:CreditCard,Sales:BarChart3,Royalties:BarChart3,Payouts:CreditCard,Campaigns:Mail,Services:Package,Support:LifeBuoy,Leads:Users,Notifications:Bell,Team:Users,Settings:Settings};
 const stages:Record<string,string[]>={'Received':['In review','Changes requested'],'Uploaded':['In review','Approved','Changes requested'],'In review':['Approved','Changes requested'],'Changes requested':['In review'],'Approved':['In production','Completed'],'In production':['Ready to ship'],'Ready to ship':['Dispatched'],'Dispatched':['Delivered'],'Awaiting payment':['Cancelled'],'Draft':['In review']};
@@ -29,6 +28,7 @@ function newCheckoutKey(){const bytes=new Uint8Array(16);if(typeof crypto!=='und
 function saveCart(items:any[]){try{localStorage.setItem('mp-cart',JSON.stringify(items))}catch{}}
 function rememberCheckoutKey(key:string){try{sessionStorage.setItem('mp-checkout-key',key)}catch{}}
 export default function Platform({initialPath='/'}:{initialPath?:string}){
+const money=useFormattedPrice();
 const checkoutKey=useRef('');const [searchParams,setSearchParams]=useState('');const [books,setBooks]=useState(sampleBooks);const [siteSettings,setSiteSettings]=useState<any>({});const [catalogueSample,setCatalogueSample]=useState(true);const [path,setPath]=useState(initialPath);const [loadedData,setData]=useState<any>({records:[],history:[],members:[]});const [loading,setLoading]=useState(true);const [notice,setNotice]=useState('');const [error,setError]=useState('');const [cart,setCart]=useState<any[]>([]);const [query,setQuery]=useState('');const [filter,setFilter]=useState('All');const [modal,setModal]=useState<any>(null);const [drawer,setDrawer]=useState<any>(null);const [busy,setBusy]=useState(false);const [menu,setMenu]=useState(false);const [price,setPrice]=useState(349);const [cost,setCost]=useState(180);const [fee,setFee]=useState(10);const [share,setShare]=useState(50);const [units,setUnits]=useState(100);const [draft,setDraft]=useState('');const [lastSave,setLastSave]=useState('');const [tablePage,setTablePage]=useState(1);
 const isOperationsRoute=path==='/admin'||path.startsWith('/admin/');
 const data=portalData(loadedData,isOperationsRoute);
