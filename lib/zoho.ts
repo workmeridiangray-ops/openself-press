@@ -43,6 +43,7 @@ export async function pushLeadToZoho(lead:any):Promise<boolean>{
         Email:lead.email,
         Phone:lead.phone,
         Lead_Source:'Website',
+        Source_Page:lead.source||'free-publishing-landing',
         City:lead.city,
         State:lead.state,
         Country:lead.country,
