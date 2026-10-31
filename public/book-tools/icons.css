@@ -1,0 +1,3 @@
+button:has(i):not(:has(span)){min-width:30px}.ti:before{content:"•"}.ti-square:before{content:"□"}.ti-circle:before{content:"○"}.ti-line:before{content:"—"}.ti-trash:before{content:"×"}.ti-copy:before{content:"⧉"}.ti-photo-up:before{content:"▧"}.ti-ruler-2:before{content:"⊞"}.ti-background:before{content:"◐"}
+
+.ti-typography:before{content:"T"}.ti-user-edit:before{content:"A"}.ti-quote:before{content:"“"}.ti-layout-align-center:before{content:"↔"}.ti-layout-align-middle:before{content:"↕"}.ti-bring-forward:before{content:"↑"}.ti-send-backward:before{content:"↓"}.ti-align-left:before{content:"≡←"}.ti-align-center:before{content:"≡"}.ti-align-right:before{content:"→≡"}

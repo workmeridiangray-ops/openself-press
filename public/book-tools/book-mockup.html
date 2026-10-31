@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book mockup — Meridian Press</title>
+<link rel="stylesheet" href="/book-tools/style.css">
+<link rel="stylesheet" href="/book-tools/book-mockup.css">
+<link rel="stylesheet" href="/book-tools/icons.css">
+</head>
+<body><div id="toolNotice" style="padding:8px 18px;background:#e6edce;font:12px Arial">Using the saved manuscript and cover for this book.</div>
+
+<div class="bm-topbar">
+  <a id="journeyBack" href="/workspace/books" target="_top" style="font-family:var(--ui); font-size:0.8rem; color:var(--ink-soft); text-decoration:none;">← Back to dashboard</a>
+  <span class="spacer"></span>
+  <span id="mockupSourceNote" style="font-family:var(--ui); font-size:0.78rem; color:var(--walnut-dim);"></span>
+</div>
+
+<div class="bm-body">
+
+  <aside class="bm-controls">
+    <h4>Angle presets</h4>
+    <div class="bm-preset-grid" id="anglePresets">
+      <div class="bm-preset-thumb selected" data-preset="threequarter">3/4 angle</div>
+      <div class="bm-preset-thumb" data-preset="front">Front-on</div>
+      <div class="bm-preset-thumb" data-preset="side">Side lean</div>
+      <div class="bm-preset-thumb" data-preset="dramatic">Dramatic tilt</div>
+    </div>
+
+    <h4>Fine-tune rotation</h4>
+    <div class="bm-field">
+      <label>Rotate Y (turn)</label>
+      <div class="bm-range-row">
+        <input type="range" id="rotateY" min="-60" max="60" value="-30">
+        <span class="bm-range-value" id="rotateYValue">-30°</span>
+      </div>
+    </div>
+    <div class="bm-field">
+      <label>Rotate X (tilt)</label>
+      <div class="bm-range-row">
+        <input type="range" id="rotateX" min="-30" max="30" value="8">
+        <span class="bm-range-value" id="rotateXValue">8°</span>
+      </div>
+    </div>
+    <div class="bm-field">
+      <label>Book thickness (pages)</label>
+      <div class="bm-range-row">
+        <input type="range" id="bookThickness" min="10" max="70" value="30">
+        <span class="bm-range-value" id="bookThicknessValue">30px</span>
+      </div>
+    </div>
+    <div class="bm-field">
+      <label>Scale</label>
+      <div class="bm-range-row">
+        <input type="range" id="bookScale" min="60" max="140" value="100">
+        <span class="bm-range-value" id="bookScaleValue">100%</span>
+      </div>
+    </div>
+
+    <h4>Background</h4>
+    <div class="bm-preset-grid">
+      <div class="bm-preset-thumb selected" data-bg="bg-paper">Paper</div>
+      <div class="bm-preset-thumb" data-bg="bg-dark">Dark</div>
+      <div class="bm-preset-thumb" data-bg="bg-warm">Warm</div>
+      <div class="bm-preset-thumb" data-bg="bg-cool">Cool</div>
+      <div class="bm-preset-thumb" data-bg="bg-brick">Brick</div>
+    </div>
+
+    <h4>Cover source</h4>
+    <div class="bm-field">
+      <label for="mockupTitle">Title (if no design found)</label>
+      <input type="text" id="mockupTitle" value="The Salt Line">
+    </div>
+    <div class="bm-field">
+      <label for="mockupAuthor">Author (if no design found)</label>
+      <input type="text" id="mockupAuthor" value="Radhika Menon">
+    </div>
+
+    <div class="bm-actions">
+      <button class="btn btn-primary" id="downloadMockupBtn" style="flex:1; justify-content:center;">Download PNG</button>
+    </div>
+    <p class="bm-note">Uses your saved cover design when available, falling back to a placeholder cover built from the title and author above. Reopen this page any time to regenerate a marketing shot as your cover changes.</p>
+  </aside>
+
+  <div class="bm-stage-wrap">
+    <div class="bm-stage bg-paper" id="bmStage">
+      <div class="bm-book-group" id="bmBookGroup">
+        <div class="bm-book" id="bmBook">
+          <div class="bm-face bm-face-front" id="bmFaceFront"></div>
+          <div class="bm-face bm-face-spine" id="bmFaceSpine"></div>
+          <div class="bm-face bm-face-pages" id="bmFacePages"></div>
+          <div class="bm-face bm-face-back" id="bmFaceBack"></div>
+        </div>
+      </div>
+      <div class="bm-shadow" id="bmShadow"></div>
+    </div>
+  </div>
+
+</div>
+
+
+
+
+
+
+
+<script src="/book-tools/html2canvas.min.js"></script><script src="/book-tools/bridge.js"></script><script src="/book-tools/book-mockup.js"></script></body>
+</html>

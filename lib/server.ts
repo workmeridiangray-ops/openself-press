@@ -1,0 +1,19 @@
+import {env} from 'cloudflare:workers';
+import {getApplicationUser} from './author-auth';
+export const db=()=>env.DB!;export const secrets=()=>env as any;
+export const reply=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
+export async function user(){const u=await getApplicationUser();if(!u)throw Error('Sign in required');await db().prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(u.userId,u.email,'author').run();const m=await db().prepare('SELECT role FROM members WHERE id=?').bind(u.userId).first<any>();return {...u,role:u.authMethod==='password'?'author':m?.role||'author'}}
+export const isStaff=(u:any)=>['staff','admin'].includes(u.role);
+export function staff(u:any,adminOnly=false){if(adminOnly?u.role!=='admin':!isStaff(u))throw Error('Staff access required')}
+export async function record(id:string,u?:any){const r=await db().prepare('SELECT * FROM records WHERE id=?').bind(id).first<any>();if(!r||u&&r.owner!==u.userId&&!isStaff(u))throw Error('Record not found');return {...r,data:JSON.parse(r.data)}}
+export async function list(kind:string,owner?:string){const q=owner?db().prepare('SELECT * FROM records WHERE kind=? AND owner=? ORDER BY created DESC').bind(kind,owner):db().prepare('SELECT * FROM records WHERE kind=? ORDER BY created DESC').bind(kind);return (await (kind==='Revisions'?(owner?db().prepare('SELECT * FROM records WHERE kind=? AND owner=? ORDER BY created DESC LIMIT 100').bind(kind,owner):db().prepare('SELECT * FROM records WHERE kind=? ORDER BY created DESC LIMIT 100').bind(kind)):q).all<any>()).results.map(r=>({...r,data:JSON.parse(r.data)}))}
+export function insert(id:string,owner:string,kind:string,status:string,data:any){const now=new Date().toISOString();return db().prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,1)').bind(id,owner,kind,status,JSON.stringify(data),now,now)}
+export async function create(owner:string,kind:string,status:string,data:any,id=crypto.randomUUID()){await insert(id,owner,kind,status,data).run();return id}
+export function update(r:any,status:string,data:any){return db().prepare('UPDATE records SET status=?,data=?,updated=?,version=version+1 WHERE id=? AND version=?').bind(status,JSON.stringify(data),new Date().toISOString(),r.id,r.version)}
+export async function change(r:any,status:string,data:any){const result=await update(r,status,data).run();if(!result.meta.changes)throw Error('Record changed; refresh and try again')}
+export async function audit(id:string,actor:string,action:string){await db().prepare('INSERT INTO activity VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,actor,action,new Date().toISOString()).run()}
+export async function notify(owner:string,title:string,message:string,recordId:string,email?:string,id?:string){if(!email){email=(await db().prepare('SELECT email FROM members WHERE id=?').bind(owner).first<any>())?.email}const notificationId=await create(owner,'Notifications','Unsent',{title,message,recordId,email:email||''},id);if(secrets().RESEND_API_KEY&&secrets().EMAIL_FROM){try{const {sendNotification}=await import('./providers');await sendNotification(await record(notificationId))}catch{}}return notificationId}
+export async function settings(){try{return (await record('site-config')).data}catch{return {brand:'Meridian Press',businessName:'',contactEmail:'',address:'',policies:{},launchReady:false}}}
+export function origin(req:Request){if(req.headers.get('origin')&&req.headers.get('origin')!==new URL(req.url).origin)throw Error('Invalid request origin')}
+
+export async function markInvoicePaid(orderId:string,reference:string){await db().prepare("UPDATE records SET status='Paid',data=json_set(data,'$.paymentReference',?),updated=?,version=version+1 WHERE id=? AND kind='Invoices'").bind(reference,new Date().toISOString(),'invoice-'+orderId).run()}

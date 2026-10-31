@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ebook developer — Meridian Press</title>
+<link rel="stylesheet" href="/book-tools/style.css">
+<link rel="stylesheet" href="/book-tools/ebook-developer.css">
+<link rel="stylesheet" href="/book-tools/icons.css">
+</head>
+<body><div id="toolNotice" style="padding:8px 18px;background:#e6edce;font:12px Arial">Using the saved manuscript and cover for this book.</div>
+
+<div class="eb-topbar">
+  <a id="journeyBack" href="/workspace/books" target="_top" style="font-family:var(--ui); font-size:0.8rem; color:var(--ink-soft); text-decoration:none;">← Back to dashboard</a>
+  <span class="spacer"></span>
+  <span id="ebSourceNote" style="font-family:var(--ui); font-size:0.78rem; color:var(--walnut-dim);"></span>
+</div>
+
+<div class="eb-body">
+
+  <aside class="eb-controls">
+    <h4>Reading theme</h4>
+    <div class="eb-theme-grid" id="themePresets">
+      <div class="eb-theme-thumb selected" data-theme="theme-sepia">Sepia</div>
+      <div class="eb-theme-thumb" data-theme="theme-white">White</div>
+      <div class="eb-theme-thumb" data-theme="theme-dark">Dark</div>
+    </div>
+
+    <h4>Typography</h4>
+    <div class="eb-field">
+      <label for="ebFontFamily">Font</label>
+      <select id="ebFontFamily">
+        <option value="Georgia, serif" selected>Georgia</option>
+        <option value="'Times New Roman', serif">Times New Roman</option>
+        <option value="'Palatino Linotype', serif">Palatino</option>
+        <option value="Arial, sans-serif">Arial (sans)</option>
+      </select>
+    </div>
+    <div class="eb-field">
+      <label>Font size</label>
+      <div class="eb-range-row">
+        <input type="range" id="ebFontSize" min="12" max="24" value="17">
+        <span class="eb-range-value" id="ebFontSizeValue">17px</span>
+      </div>
+    </div>
+    <div class="eb-field">
+      <label>Line spacing</label>
+      <div class="eb-range-row">
+        <input type="range" id="ebLineHeight" min="10" max="24" value="16">
+        <span class="eb-range-value" id="ebLineHeightValue">1.6</span>
+      </div>
+    </div>
+
+    <h4>Metadata for export</h4>
+    <div class="eb-field">
+      <label for="ebTitle">Title</label>
+      <input type="text" id="ebTitle" value="Untitled manuscript">
+    </div>
+    <div class="eb-field">
+      <label for="ebAuthor">Author</label>
+      <input type="text" id="ebAuthor" value="">
+    </div>
+    <div class="eb-field">
+      <label for="ebLanguage">Language code</label>
+      <input type="text" id="ebLanguage" value="en">
+    </div>
+
+    <div class="eb-validation" id="ebValidation">
+      <div class="eb-validation-item"><i class="ti ti-loader"></i> Checking manuscript…</div>
+    </div>
+
+    <div class="eb-actions">
+      <button class="btn btn-primary" id="downloadEpubBtn" style="flex:1; justify-content:center;">Download EPUB</button>
+    </div>
+    <p style="font-family:var(--ui); font-size:0.74rem; color:var(--walnut-dim); margin-top:1em; line-height:1.5;">Prepares an EPUB 3 draft — one chapter per XHTML file, a navigation document, and full package metadata — for review in your preferred e-reader. Validate the exported file before retail distribution.</p>
+  </aside>
+
+  <div class="eb-preview-wrap">
+    <div class="eb-device">
+      <div class="eb-device-screen theme-sepia" id="ebScreen">
+        <div class="eb-page-content" id="ebPageContent">
+          <p style="text-align:center; color:inherit; opacity:0.6;">Loading manuscript…</p>
+        </div>
+      </div>
+      <div class="eb-device-footer">
+        <button id="ebPrevBtn" disabled><i class="ti ti-chevron-left"></i></button>
+        <span id="ebPageIndicator">— of —</span>
+        <button id="ebNextBtn" disabled><i class="ti ti-chevron-right"></i></button>
+      </div>
+    </div>
+    <div class="eb-chapter-nav" id="ebChapterNav"></div>
+  </div>
+
+</div>
+
+
+
+
+
+
+
+<script src="/book-tools/jszip.min.js"></script><script src="/book-tools/bridge.js"></script><script src="/book-tools/ebook-developer.js"></script></body>
+</html>

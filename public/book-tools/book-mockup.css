@@ -1,0 +1,121 @@
+/* ============================================================
+   Meridian Press — Book mockup generator
+   Real CSS 3D transforms: angled cover + spine + page edge,
+   not a flat image with a skew filter.
+   ============================================================ */
+
+.bm-shell{ display:flex; min-height:100vh; }
+.bm-topbar{
+  display:flex; align-items:center; gap:1rem;
+  padding:0.7em 1.2em;
+  border-bottom:1px solid var(--rule-dark);
+  background:var(--paper);
+  position:fixed; top:0; left:0; right:0; z-index:10;
+}
+.bm-topbar .spacer{ flex:1; }
+
+.bm-body{ display:flex; width:100%; padding-top:60px; }
+
+.bm-controls{
+  width:300px; flex-shrink:0;
+  border-right:1px solid var(--rule-dark);
+  background:var(--paper-dim);
+  padding:1.4em;
+  overflow-y:auto;
+  height:calc(100vh - 60px);
+}
+.bm-controls h4{
+  font-family:var(--ui); font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em;
+  color:var(--walnut-dim); margin:1.4em 0 0.6em;
+}
+.bm-controls h4:first-child{ margin-top:0; }
+.bm-field{ margin-bottom:1em; }
+.bm-field label{
+  display:block; font-family:var(--ui); font-size:0.78rem; font-weight:600;
+  color:var(--ink-soft); margin-bottom:0.35em;
+}
+.bm-field select, .bm-field input[type="text"]{
+  width:100%; font-family:var(--ui); font-size:0.85rem;
+  padding:0.5em 0.6em; border:1px solid var(--rule-dark); background:var(--paper); color:var(--ink);
+}
+.bm-range-row{ display:flex; align-items:center; gap:0.6em; }
+.bm-range-row input[type="range"]{ flex:1; }
+.bm-range-row .bm-range-value{ font-family:var(--ui); font-size:0.76rem; color:var(--walnut-dim); width:40px; text-align:right; }
+
+.bm-preset-grid{ display:grid; grid-template-columns:1fr 1fr; gap:0.5em; }
+.bm-preset-thumb{
+  border:1.5px solid var(--rule-dark); cursor:pointer; padding:0.6em;
+  font-family:var(--ui); font-size:0.76rem; color:var(--ink-soft); text-align:center;
+}
+.bm-preset-thumb.selected{ border-color:var(--ink); border-width:2px; color:var(--ink); }
+
+.bm-stage-wrap{
+  flex:1;
+  display:flex; align-items:center; justify-content:center;
+  min-height:calc(100vh - 60px);
+  overflow:auto;
+  padding:3em;
+}
+.bm-stage{
+  width:900px; height:640px;
+  position:relative;
+  perspective:1600px;
+  border-radius:4px;
+  overflow:hidden;
+  flex-shrink:0;
+}
+.bm-stage.bg-paper{ background:var(--paper-dim); }
+.bm-stage.bg-dark{ background:#1C2B33; }
+.bm-stage.bg-warm{ background:linear-gradient(160deg, #E8DFC8, #D8CDA8); }
+.bm-stage.bg-cool{ background:linear-gradient(160deg, #D8E4E8, #B8CCD4); }
+.bm-stage.bg-brick{ background:linear-gradient(160deg, #C97A5C, #A5573C); }
+
+.bm-book-group{
+  position:absolute; left:50%; top:50%;
+  transform-style:preserve-3d;
+}
+
+.bm-book{
+  position:relative;
+  transform-style:preserve-3d;
+}
+
+.bm-face{
+  position:absolute;
+  backface-visibility:hidden;
+  box-shadow:0 2px 6px rgba(0,0,0,0.15);
+}
+.bm-face-front{
+  background-size:cover; background-position:center;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.bm-face-spine{
+  background:#EDE7D8;
+  display:flex; align-items:center; justify-content:center;
+}
+.bm-face-pages{
+  background:repeating-linear-gradient(
+    to bottom, #F7F4EA 0px, #F7F4EA 1px, #E8E2D0 1px, #E8E2D0 2px
+  );
+}
+.bm-face-back{ background:#EDE7D8; }
+
+.bm-shadow{
+  position:absolute;
+  border-radius:50%;
+  background:radial-gradient(ellipse at center, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 70%);
+  filter:blur(4px);
+}
+
+.bm-cover-fallback{
+  width:100%; height:100%;
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  padding:1.5em; box-sizing:border-box; text-align:center;
+  background:linear-gradient(160deg, #1C2B33, #0F171C);
+  color:#FAF7F0;
+}
+.bm-cover-fallback .bm-fb-title{ font-family:'Fraunces', serif; font-weight:700; font-size:1.4em; margin-bottom:0.3em; }
+.bm-cover-fallback .bm-fb-author{ font-family:'Inter', sans-serif; font-size:0.8em; color:#D8CEB0; }
+
+.bm-actions{ display:flex; gap:0.8em; margin-top:1.6em; }
+.bm-note{ font-family:var(--ui); font-size:0.76rem; color:var(--walnut-dim); margin-top:1em; line-height:1.5; }

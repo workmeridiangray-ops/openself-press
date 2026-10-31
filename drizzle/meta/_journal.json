@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793283389339,
+      "tag": "0000_absent_squirrel_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793283851993,
+      "tag": "0001_loud_war_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793313780007,
+      "tag": "0002_blue_viper",
+      "breakpoints": true
+    }
+  ]
+}

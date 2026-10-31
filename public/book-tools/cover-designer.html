@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cover designer — Meridian Press</title>
+<link rel="stylesheet" href="/book-tools/style.css">
+<link rel="stylesheet" href="/book-tools/cover-designer.css">
+<link rel="stylesheet" href="/book-tools/icons.css">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&family=Playfair+Display:wght@400;700&family=Bebas+Neue&family=Oswald:wght@400;600&family=Cormorant+Garamond:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body><div id="toolNotice" role="status" style="padding:8px 18px;background:#e6edce;font:12px Arial">Changes are stored in this book’s workspace. Wait for “All changes saved” before leaving.</div>
+
+<div class="cd-topbar">
+  <a id="journeyBack" href="/workspace/books" target="_top" style="font-family:var(--ui); font-size:0.8rem; color:var(--ink-soft); text-decoration:none;">← Back to dashboard</a>
+  <button id="saveNowButton" type="button">Save now</button><button id="coverProofButton" type="button">Save cover proof for review</button><span class="spacer"></span>
+  <span class="save-state" id="saveState" style="font-family:var(--ui); font-size:0.78rem; color:var(--walnut-dim);">Loading your saved book…</span>
+  <div class="role-switch">
+    <button id="btnAuthorRole" class="active">Author view</button>
+    <button id="btnDesignerRole">Designer view</button>
+  </div>
+</div>
+
+<div class="cd-shell">
+
+  <!-- LEFT: templates + specs -->
+  <aside class="cd-panel">
+    <h4>Templates</h4>
+    <div class="template-grid" id="templateGrid">
+      <div class="template-thumb selected" data-template="centered">Title centered</div>
+      <div class="template-thumb" data-template="band">Image band</div>
+      <div class="template-thumb" data-template="minimal">Minimal text</div>
+      <div class="template-thumb" data-template="bold">Bold banner</div>
+    </div>
+
+    <h4>Book specs</h4>
+    <div class="cd-field">
+      <label for="trimSize">Trim size</label>
+      <select id="trimSize">
+        <option value="5x8">5" × 8"</option>
+        <option value="5.5x8.5" selected>5.5" × 8.5"</option>
+        <option value="6x9">6" × 9"</option>
+        <option value="8.5x8.5">8.5" × 8.5" (square)</option>
+        <option value="8.5x11">8.5" × 11" (letter)</option>
+      </select>
+    </div>
+    <div class="cd-field">
+      <label for="pageCount">Page count (from manuscript)</label>
+      <input type="number" id="pageCount" value="220" min="24" max="800">
+    </div>
+
+    <h4>Cover dimensions</h4>
+    <div class="cd-dims"><span>Front panel</span><strong id="dimFront">—</strong></div>
+    <div class="cd-dims"><span>Spine width</span><strong id="dimSpine">—</strong></div>
+    <div class="cd-dims"><span>Full wrap</span><strong id="dimFull">—</strong></div>
+    <div class="cd-dims"><span>Bleed</span><strong>0.125"</strong></div>
+    <p style="font-family:var(--ui); font-size:0.74rem; color:var(--walnut-dim); margin-top:1em;">Spine width is estimated from page count using a standard paper-stock formula. Final spine measurement is confirmed by the print vendor before production.</p>
+  </aside>
+
+  <!-- CENTER: canvas -->
+  <section style="display:flex; flex-direction:column; min-width:0;">
+    <div class="cd-toolbar">
+      <div class="cd-tb-group">
+        <button id="addTitleText" title="Add title text"><i class="ti ti-typography"></i> Title</button>
+        <button id="addAuthorText" title="Add author text"><i class="ti ti-user-edit"></i> Author</button>
+        <button id="addTaglineText" title="Add tagline text"><i class="ti ti-quote"></i> Tagline</button>
+      </div>
+      <div class="tb-sep"></div>
+      <div class="cd-tb-group">
+        <button id="addRectShape" title="Add rectangle"><i class="ti ti-square"></i></button>
+        <button id="addCircleShape" title="Add circle"><i class="ti ti-circle"></i></button>
+        <button id="addLineShape" title="Add line"><i class="ti ti-line"></i></button>
+      </div>
+      <div class="tb-sep"></div>
+      <div class="cd-tb-group">
+        <label class="cd-color-btn" title="Background color">
+          <i class="ti ti-background"></i>
+          <input type="color" id="bgColorInput" value="#1C2B33">
+        </label>
+        <button id="uploadBgBtn" title="Upload background image"><i class="ti ti-photo-up"></i></button>
+        <input type="file" id="bgImageInput" accept="image/*" style="display:none;">
+      </div>
+      <div class="tb-sep"></div>
+      <div class="cd-tb-group">
+        <button id="alignHorizCenter" title="Center horizontally on front panel"><i class="ti ti-layout-align-center"></i></button>
+        <button id="alignVertCenter" title="Center vertically"><i class="ti ti-layout-align-middle"></i></button>
+        <button id="toggleGuides" title="Toggle guides"><i class="ti ti-ruler-2"></i></button>
+      </div>
+      <div class="tb-sep"></div>
+      <div class="cd-tb-group">
+        <button id="bringForwardBtn" title="Bring forward" disabled><i class="ti ti-bring-forward"></i></button>
+        <button id="sendBackwardBtn" title="Send backward" disabled><i class="ti ti-send-backward"></i></button>
+        <button id="duplicateElBtn" title="Duplicate" disabled><i class="ti ti-copy"></i></button>
+        <button id="deleteElBtn" title="Delete" disabled><i class="ti ti-trash"></i></button>
+      </div>
+    </div>
+
+    <div class="cd-scroll">
+      <div class="cd-canvas-wrap">
+        <div class="cd-canvas" id="cdCanvas"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: properties + layers -->
+  <aside class="cd-props">
+    <h4>Element properties</h4>
+    <div id="propsPanel">
+      <div class="no-selection">Select an element on the cover to edit it.</div>
+    </div>
+
+    <h4>Layers</h4>
+    <div id="layersList"></div>
+  </aside>
+
+</div>
+
+
+
+
+
+
+<script src="/book-tools/bridge.js"></script><script src="/book-tools/cover-designer.js"></script></body>
+</html>
