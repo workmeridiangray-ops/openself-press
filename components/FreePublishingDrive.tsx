@@ -230,7 +230,7 @@ export default function FreePublishingDrive(){
 }
 
 const FPD_CSS=`
-.fpd-wrap{--deep:#284f43;--deep2:#1d3a31;--ivory:#f6f3ea;--paper:#fffdf8;--line:#dfe3d7;--accent:#c96a3f;--muted:#5d6b63;--good:#2e7d5b;--ink:#1f2e29;
+.fpd-wrap{--deep:#142E24;--deep2:#0d1f18;--ivory:#F8F5ED;--paper:#fffdf8;--line:#ded9c6;--accent:#AA803B;--muted:#52643B;--good:#52643B;--ink:#142E24;
   background:var(--ivory);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5}
 .fpd-wrap h1,.fpd-wrap h2,.fpd-wrap h3{font-family:Georgia,'Times New Roman',serif;margin:0 0 .4em;color:var(--deep2)}
 .fpd-wrap p{margin:0 0 1em}
