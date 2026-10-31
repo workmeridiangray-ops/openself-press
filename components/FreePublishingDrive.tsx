@@ -1,6 +1,6 @@
 'use client';
 import React,{useState} from 'react';
-import {ArrowRight} from 'lucide-react';
+import {ArrowLeft,ArrowRight,CheckCircle2,BookOpen,Sparkles,ShieldCheck} from 'lucide-react';
 
 const HOW_HEARD=['Instagram','Threads','Quora','Facebook','WhatsApp','A friend / word of mouth','Other'];
 const EXTRAS=['Postcards','Visiting cards','Bookmarks','Stickers','Other','None of these'];
@@ -88,196 +88,126 @@ export default function FreePublishingDrive(){
   }
 
   if(saved){
-    return <div className="fpd-wrap">
-      <style dangerouslySetInnerHTML={{__html:FPD_CSS}}/>
-      <div className="fpd-confirm">
-        <h2>You're in. Welcome.</h2>
-        <p>Save this access code — you'll use it later to activate your free publishing slot when it's your turn.</p>
-        <div className="fpd-code">{code}</div>
-        <button className="fpd-ghost" onClick={copyCode}>{copied?'Copied!':'Copy code'}</button>
-        <p className="fpd-small">Your application has been recorded.</p>
-        <div style={{marginTop:22}}>
-          <a className="fpd-primary" style={{textDecoration:'none',display:'inline-flex',alignItems:'center',gap:6}} href={'/login?next='+encodeURIComponent('/submit?code='+code)} target="_top">Continue to submit your manuscript<ArrowRight size={16}/></a>
+    return <main className="content-section page-content book-start" style={{maxWidth:640}}>
+      <p className="eyebrow">APPLICATION RECEIVED</p>
+      <h1>You're in. Welcome.</h1>
+      <p className="lead">Save this access code — you'll use it later to activate your free publishing slot when it's your turn.</p>
+      <section className="panel" style={{textAlign:'center'}}>
+        <div className="next-action" style={{margin:'0 0 20px'}}>
+          <span style={{fontFamily:'Georgia,serif',fontSize:30,letterSpacing:'.06em',fontWeight:700,color:'var(--ink)'}}>{code}</span>
         </div>
-        <p className="fpd-small" style={{marginTop:12}}>Ready now? Log in or create your author account with the same email, and your code carries through automatically.</p>
-      </div>
-    </div>
+        <button className="text-button" onClick={copyCode}>{copied?'Copied!':'Copy code'}</button>
+        <p className="muted" style={{marginTop:10}}>Your application has been recorded.</p>
+        <div style={{marginTop:22}}>
+          <a className="primary" href={'/login?next='+encodeURIComponent('/submit?code='+code)} target="_top">Continue to submit your manuscript<ArrowRight size={16}/></a>
+        </div>
+        <p className="muted" style={{marginTop:14,fontSize:13}}>Ready now? Log in or create your author account with the same email, and your code carries through automatically.</p>
+      </section>
+    </main>
   }
 
-  return <div className="fpd-wrap">
-    <style dangerouslySetInnerHTML={{__html:FPD_CSS}}/>
-    <div className="fpd-hero">
-      <div className="fpd-eyebrow">A Free Publishing Initiative</div>
-      <h1>We're opening 100 free self-publishing slots.</h1>
-      <p className="fpd-lead">Publishing shouldn't cost a writer their savings. We're starting with 100 authors — no publishing fee, no catch — because we believe the next great book shouldn't stay unwritten over money.</p>
-      <div className="fpd-badges">
-        <span>100 slots, free of cost</span>
-        <span>Priority by application order</span>
-        <span>Takes about 3 minutes</span>
-      </div>
+  return <main className="content-section page-content book-start">
+    <p className="eyebrow">A FREE PUBLISHING INITIATIVE</p>
+    <h1>We're opening 100 free self-publishing slots.</h1>
+    <p className="lead">Publishing shouldn't cost a writer their savings. We're starting with 100 authors — no publishing fee, no catch — because we believe the next great book shouldn't stay unwritten over money.</p>
+
+    <div className="three-col" style={{margin:'28px 0 40px'}}>
+      <article className="journey-card"><Sparkles size={25}/><h3>No publishing fee</h3><p>Your manuscript becomes a real, purchasable book — on us.</p></article>
+      <article className="journey-card"><BookOpen size={25}/><h3>You keep your rights</h3><p>It's your book, your name, your royalties.</p></article>
+      <article className="journey-card"><ShieldCheck size={25}/><h3>A real production team</h3><p>Editing guidance, cover design and a proper print/ebook release.</p></article>
     </div>
 
-    <div className="fpd-why">
-      <h2>Why we're doing this</h2>
-      <p className="fpd-why-sub">Too many good manuscripts never become books — priced out, stuck in submission queues, or simply unsure where to start. This is our way of changing that for 100 writers, starting now.</p>
-      <div className="fpd-why-grid">
-        <div><h3>No publishing fee</h3><p>Your manuscript becomes a real, purchasable book — on us.</p></div>
-        <div><h3>You keep your rights</h3><p>It's your book, your name, your royalties.</p></div>
-        <div><h3>A real production team</h3><p>Editing guidance, cover design and a proper print/ebook release.</p></div>
-      </div>
-    </div>
+    <ol className="journey-progress" style={{gridTemplateColumns:'repeat(6,1fr)'}}>
+      {STEP_LABELS.map((label,i)=><li key={label} className={i===step?'active':i<step?'done':''}><span>{i<step?<CheckCircle2 size={14}/>:i+1}</span>{label}</li>)}
+    </ol>
 
-    <div className="fpd-card">
-      <div className="fpd-progress">{STEP_LABELS.map((_,i)=><span key={i} className={i<step?'done':i===step?'now':''}/>)}</div>
-      {serverError&&<div className="fpd-servererr" role="alert">{serverError}</div>}
+    <form className="panel" onSubmit={e=>{e.preventDefault();next()}}>
+      {serverError&&<p role="alert" className="studio-error">{serverError}</p>}
 
-      {step===0&&<section>
-        <div className="fpd-steplabel">Step 1 of 6</div>
+      {step===0&&<>
         <h2>About you</h2>
-        <p className="fpd-hint">So we know who's applying.</p>
-        <label>Full name</label>
-        <input value={f.name} maxLength={120} onChange={e=>set('name',e.target.value)} autoComplete="name"/>
-        {errors.name&&<div className="fpd-err">Please enter your full name.</div>}
-        <div className="fpd-row2">
-          <div><label>Phone number</label><input value={f.phone} maxLength={20} onChange={e=>set('phone',e.target.value)} autoComplete="tel"/>{errors.phone&&<div className="fpd-err">Please enter a valid phone number.</div>}</div>
-          <div><label>Email address</label><input value={f.email} maxLength={200} onChange={e=>set('email',e.target.value)} autoComplete="email"/>{errors.email&&<div className="fpd-err">Please enter a valid email.</div>}</div>
+        <p className="muted">So we know who's applying.</p>
+        <div className="form-grid">
+          <label className="full">Full name<input value={f.name} maxLength={120} onChange={e=>set('name',e.target.value)} autoComplete="name"/>{errors.name&&<small style={{color:'#b3432f'}}>Please enter your full name.</small>}</label>
+          <label>Phone number<input value={f.phone} maxLength={20} onChange={e=>set('phone',e.target.value)} autoComplete="tel"/>{errors.phone&&<small style={{color:'#b3432f'}}>Please enter a valid phone number.</small>}</label>
+          <label>Email address<input value={f.email} maxLength={200} onChange={e=>set('email',e.target.value)} autoComplete="email"/>{errors.email&&<small style={{color:'#b3432f'}}>Please enter a valid email.</small>}</label>
         </div>
-      </section>}
+      </>}
 
-      {step===1&&<section>
-        <div className="fpd-steplabel">Step 2 of 6</div>
+      {step===1&&<>
         <h2>Where are you writing from?</h2>
-        <div className="fpd-row2">
-          <div><label>Country</label><input value={f.country} maxLength={80} onChange={e=>set('country',e.target.value)} autoComplete="country-name"/>{errors.country&&<div className="fpd-err">Please enter your country.</div>}</div>
-          <div><label>State</label><input value={f.state} maxLength={80} onChange={e=>set('state',e.target.value)} autoComplete="address-level1"/>{errors.state&&<div className="fpd-err">Please enter your state.</div>}</div>
+        <div className="form-grid">
+          <label>Country<input value={f.country} maxLength={80} onChange={e=>set('country',e.target.value)} autoComplete="country-name"/>{errors.country&&<small style={{color:'#b3432f'}}>Please enter your country.</small>}</label>
+          <label>State<input value={f.state} maxLength={80} onChange={e=>set('state',e.target.value)} autoComplete="address-level1"/>{errors.state&&<small style={{color:'#b3432f'}}>Please enter your state.</small>}</label>
+          <label>City<input value={f.city} maxLength={80} onChange={e=>set('city',e.target.value)} autoComplete="address-level2"/>{errors.city&&<small style={{color:'#b3432f'}}>Please enter your city.</small>}</label>
+          <label>PIN / ZIP code<input value={f.pin} maxLength={12} onChange={e=>set('pin',e.target.value)} autoComplete="postal-code"/>{errors.pin&&<small style={{color:'#b3432f'}}>Please enter your PIN/ZIP code.</small>}</label>
         </div>
-        <div className="fpd-row2">
-          <div><label>City</label><input value={f.city} maxLength={80} onChange={e=>set('city',e.target.value)} autoComplete="address-level2"/>{errors.city&&<div className="fpd-err">Please enter your city.</div>}</div>
-          <div><label>PIN / ZIP code</label><input value={f.pin} maxLength={12} onChange={e=>set('pin',e.target.value)} autoComplete="postal-code"/>{errors.pin&&<div className="fpd-err">Please enter your PIN/ZIP code.</div>}</div>
-        </div>
-      </section>}
+      </>}
 
-      {step===2&&<section>
-        <div className="fpd-steplabel">Step 3 of 6</div>
+      {step===2&&<>
         <h2>How did you hear about us?</h2>
-        <div className="fpd-choices">{HOW_HEARD.map(v=><span key={v} className={'fpd-chip'+(f.howHeard===v?' sel':'')} onClick={()=>set('howHeard',v)}>{v}</span>)}</div>
-        {errors.howHeard&&<div className="fpd-err">Please select one.</div>}
-        {f.howHeard==='Other'&&<><label>Tell us where <span className="fpd-opt">(optional)</span></label><input value={f.howHeardOther} maxLength={120} onChange={e=>set('howHeardOther',e.target.value)}/></>}
-        <label>Your handle on that platform <span className="fpd-opt">(optional)</span></label>
-        <input value={f.handle} maxLength={100} placeholder="@yourname" onChange={e=>set('handle',e.target.value)}/>
-      </section>}
+        <fieldset className="start-manuscript-status">
+          <legend>Choose one</legend>
+          {HOW_HEARD.map(v=><label className="checkbox" key={v}><input type="radio" name="howHeard" checked={f.howHeard===v} onChange={()=>set('howHeard',v)}/>{v}</label>)}
+        </fieldset>
+        {errors.howHeard&&<p style={{color:'#b3432f',fontSize:13}}>Please select one.</p>}
+        <div className="form-grid" style={{marginTop:16}}>
+          {f.howHeard==='Other'&&<label>Tell us where (optional)<input value={f.howHeardOther} maxLength={120} onChange={e=>set('howHeardOther',e.target.value)}/></label>}
+          <label>Your handle on that platform (optional)<input value={f.handle} maxLength={100} placeholder="@yourname" onChange={e=>set('handle',e.target.value)}/></label>
+        </div>
+      </>}
 
-      {step===3&&<section>
-        <div className="fpd-steplabel">Step 4 of 6</div>
+      {step===3&&<>
         <h2>Your manuscript</h2>
-        <label>Genre / category</label>
-        <select value={f.genre} onChange={e=>set('genre',e.target.value)}><option value="">Select one</option>{GENRES.map(g=><option key={g}>{g}</option>)}</select>
-        {errors.genre&&<div className="fpd-err">Please choose a genre.</div>}
-        <label>Manuscript language</label>
-        <select value={f.language} onChange={e=>set('language',e.target.value)}><option value="">Select one</option>{LANGUAGES.map(l=><option key={l}>{l}</option>)}</select>
-        {errors.language&&<div className="fpd-err">Please choose a language.</div>}
-        <label>What stage is your manuscript at?</label>
-        <select value={f.stage} onChange={e=>set('stage',e.target.value)}><option value="">Select one</option>{STAGES.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
-        {errors.stage&&<div className="fpd-err">Please select your manuscript's stage.</div>}
-        {f.stage&&f.stage!=='Complete'&&<><label>If it's not finished yet, when do you expect to complete it?</label>
-          <select value={f.completionTime} onChange={e=>set('completionTime',e.target.value)}><option value="">Select one</option>{COMPLETION_TIMES.map(c=><option key={c}>{c}</option>)}</select></>}
-        <label>How many books are you planning to publish with us?</label>
-        <select value={f.booksPlanned} onChange={e=>set('booksPlanned',e.target.value)}><option value="">Select one</option>{BOOKS_PLANNED.map(b=><option key={b}>{b}</option>)}</select>
-        {errors.booksPlanned&&<div className="fpd-err">Please make a selection.</div>}
-      </section>}
+        <div className="form-grid">
+          <label>Genre / category<select value={f.genre} onChange={e=>set('genre',e.target.value)}><option value="">Select one</option>{GENRES.map(g=><option key={g}>{g}</option>)}</select>{errors.genre&&<small style={{color:'#b3432f'}}>Please choose a genre.</small>}</label>
+          <label>Manuscript language<select value={f.language} onChange={e=>set('language',e.target.value)}><option value="">Select one</option>{LANGUAGES.map(l=><option key={l}>{l}</option>)}</select>{errors.language&&<small style={{color:'#b3432f'}}>Please choose a language.</small>}</label>
+          <label>What stage is your manuscript at?<select value={f.stage} onChange={e=>set('stage',e.target.value)}><option value="">Select one</option>{STAGES.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>{errors.stage&&<small style={{color:'#b3432f'}}>Please select your manuscript's stage.</small>}</label>
+          {f.stage&&f.stage!=='Complete'&&<label>If it's not finished yet, when do you expect to complete it?<select value={f.completionTime} onChange={e=>set('completionTime',e.target.value)}><option value="">Select one</option>{COMPLETION_TIMES.map(c=><option key={c}>{c}</option>)}</select></label>}
+          <label>How many books are you planning to publish with us?<select value={f.booksPlanned} onChange={e=>set('booksPlanned',e.target.value)}><option value="">Select one</option>{BOOKS_PLANNED.map(b=><option key={b}>{b}</option>)}</select>{errors.booksPlanned&&<small style={{color:'#b3432f'}}>Please make a selection.</small>}</label>
+        </div>
+      </>}
 
-      {step===4&&<section>
-        <div className="fpd-steplabel">Step 5 of 6</div>
+      {step===4&&<>
         <h2>Copies & extras</h2>
-        <label>How many author copies are you planning to order for yourself?</label>
-        <input type="number" min={0} max={500} placeholder="e.g. 10" value={f.authorCopies} onChange={e=>set('authorCopies',e.target.value)}/>
-        {errors.authorCopies&&<div className="fpd-err">Please enter a number (0 or more).</div>}
-        <label>Want anything shipped along with your books? <span className="fpd-opt">(select all that apply)</span></label>
-        <div className="fpd-choices">{EXTRAS.map(v=><span key={v} className={'fpd-chip'+(f.extrasWanted.includes(v)?' sel':'')} onClick={()=>toggleExtra(v)}>{v}</span>)}</div>
-        {f.extrasWanted.includes('Other')&&<><label>What else? <span className="fpd-opt">(optional)</span></label><input value={f.extrasOther} maxLength={150} onChange={e=>set('extrasOther',e.target.value)}/></>}
-        <label>Anything else you'd like us to know? <span className="fpd-opt">(optional)</span></label>
-        <textarea value={f.note} maxLength={500} onChange={e=>set('note',e.target.value)}/>
-      </section>}
+        <div className="form-grid">
+          <label>How many author copies are you planning to order for yourself?<input type="number" min={0} max={500} placeholder="e.g. 10" value={f.authorCopies} onChange={e=>set('authorCopies',e.target.value)}/>{errors.authorCopies&&<small style={{color:'#b3432f'}}>Please enter a number (0 or more).</small>}</label>
+        </div>
+        <fieldset className="start-manuscript-status" style={{marginTop:16}}>
+          <legend>Want anything shipped along with your books? (select all that apply)</legend>
+          {EXTRAS.map(v=><label className="checkbox" key={v}><input type="checkbox" checked={f.extrasWanted.includes(v)} onChange={()=>toggleExtra(v)}/>{v}</label>)}
+        </fieldset>
+        <div className="form-grid" style={{marginTop:16}}>
+          {f.extrasWanted.includes('Other')&&<label>What else? (optional)<input value={f.extrasOther} maxLength={150} onChange={e=>set('extrasOther',e.target.value)}/></label>}
+          <label className="full">Anything else you'd like us to know? (optional)<textarea value={f.note} maxLength={500} onChange={e=>set('note',e.target.value)}/></label>
+        </div>
+      </>}
 
-      {step===5&&<section>
-        <div className="fpd-steplabel">Step 6 of 6</div>
+      {step===5&&<>
         <h2>Review your application</h2>
-        <p className="fpd-hint">Check this over, then submit.</p>
-        <dl className="fpd-review">
-          <dt>Name</dt><dd>{f.name}</dd>
-          <dt>Phone</dt><dd>{f.phone}</dd>
-          <dt>Email</dt><dd>{f.email}</dd>
-          <dt>Location</dt><dd>{[f.city,f.state,f.country,f.pin].filter(Boolean).join(', ')}</dd>
-          <dt>Found us via</dt><dd>{f.howHeard}{f.howHeardOther?' — '+f.howHeardOther:''}</dd>
-          <dt>Genre</dt><dd>{f.genre}</dd>
-          <dt>Language</dt><dd>{f.language}</dd>
-          <dt>Manuscript stage</dt><dd>{f.stage}</dd>
-          {f.completionTime&&<><dt>Expected completion</dt><dd>{f.completionTime}</dd></>}
-          <dt>Books planned</dt><dd>{f.booksPlanned}</dd>
-          <dt>Author copies</dt><dd>{f.authorCopies}</dd>
-          <dt>Extras requested</dt><dd>{f.extrasWanted.join(', ')||'None'}</dd>
-          {f.note&&<><dt>Note</dt><dd>{f.note}</dd></>}
+        <p className="muted">Check this over, then submit.</p>
+        <dl className="review-list">
+          <div><dt>Name</dt><dd>{f.name}</dd></div>
+          <div><dt>Phone</dt><dd>{f.phone}</dd></div>
+          <div><dt>Email</dt><dd>{f.email}</dd></div>
+          <div><dt>Location</dt><dd>{[f.city,f.state,f.country,f.pin].filter(Boolean).join(', ')}</dd></div>
+          <div><dt>Found us via</dt><dd>{f.howHeard}{f.howHeardOther?' — '+f.howHeardOther:''}</dd></div>
+          <div><dt>Genre</dt><dd>{f.genre}</dd></div>
+          <div><dt>Language</dt><dd>{f.language}</dd></div>
+          <div><dt>Manuscript stage</dt><dd>{f.stage}</dd></div>
+          {f.completionTime&&<div><dt>Expected completion</dt><dd>{f.completionTime}</dd></div>}
+          <div><dt>Books planned</dt><dd>{f.booksPlanned}</dd></div>
+          <div><dt>Author copies</dt><dd>{f.authorCopies}</dd></div>
+          <div><dt>Extras requested</dt><dd>{f.extrasWanted.join(', ')||'None'}</dd></div>
+          {f.note&&<div><dt>Note</dt><dd>{f.note}</dd></div>}
         </dl>
-      </section>}
+      </>}
 
-      <div className="fpd-nav">
-        <button className="fpd-ghost" disabled={step===0} onClick={back}>Back</button>
-        <button className="fpd-primary" disabled={busy} onClick={next}>{busy?'Submitting…':step===STEP_LABELS.length-1?'Submit application':'Continue'}<ArrowRight size={16}/></button>
+      <div className="journey-actions">
+        <button type="button" disabled={step===0} onClick={back}><ArrowLeft size={16}/>Back</button>
+        <button className="primary" disabled={busy}>{busy?'Submitting…':step===STEP_LABELS.length-1?'Submit application':'Continue'}<ArrowRight size={16}/></button>
       </div>
-    </div>
-    <p className="fpd-footnote">This application reserves your place in line. It is not a payment, a purchase, or a guarantee of publication timeline.</p>
-  </div>
+    </form>
+    <p className="muted" style={{textAlign:'center',marginTop:20,fontSize:13}}>This application reserves your place in line. It is not a payment, a purchase, or a guarantee of publication timeline.</p>
+  </main>
 }
-
-const FPD_CSS=`
-.fpd-wrap{--deep:#142E24;--deep2:#0d1f18;--ivory:#F8F5ED;--paper:#fffdf8;--line:#ded9c6;--accent:#AA803B;--muted:#52643B;--good:#52643B;--ink:#142E24;
-  background:var(--ivory);color:var(--ink);font-family:'DM Sans',Arial,sans-serif;line-height:1.5}
-.fpd-wrap h1,.fpd-wrap h2,.fpd-wrap h3{font-family:'Libre Caslon Display',Georgia,serif;font-weight:400;margin:0 0 .4em;color:var(--deep2)}
-.fpd-wrap p{margin:0 0 1em}
-.fpd-hero{background:linear-gradient(180deg,var(--deep2),var(--deep));color:#fff;padding:56px 20px 64px;text-align:center}
-.fpd-eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:#cfe0d6;margin-bottom:14px;font-weight:600}
-.fpd-hero h1{color:#fff;font-size:clamp(28px,5vw,44px);line-height:1.15;margin:0 auto 16px;max-width:680px}
-.fpd-lead{color:#e3ece6;font-size:17px;max-width:560px;margin:0 auto 22px}
-.fpd-badges{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
-.fpd-badges span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:7px 14px;font-size:13px}
-.fpd-why{max-width:720px;margin:0 auto;padding:40px 20px 10px;text-align:center}
-.fpd-why-sub{color:var(--muted);max-width:560px;margin:0 auto}
-.fpd-why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px;text-align:left}
-.fpd-why-grid div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:18px}
-.fpd-why-grid h3{font-size:15px;margin-bottom:6px}
-.fpd-why-grid p{font-size:13.5px;color:var(--muted);margin:0}
-@media (max-width:620px){.fpd-why-grid{grid-template-columns:1fr}}
-.fpd-card{max-width:720px;margin:36px auto 0;padding:0 20px}
-.fpd-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(31,46,41,.06);max-width:680px}
-.fpd-progress{display:flex;gap:6px;margin-bottom:22px}
-.fpd-progress span{flex:1;height:5px;border-radius:4px;background:var(--line)}
-.fpd-progress span.done{background:var(--good)}
-.fpd-progress span.now{background:var(--accent)}
-.fpd-steplabel{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;font-weight:600}
-.fpd-card h2{font-size:21px;margin-bottom:4px}
-.fpd-hint{color:var(--muted);font-size:13.5px;margin-bottom:18px}
-.fpd-card label{display:block;font-size:13.5px;font-weight:600;color:var(--deep2);margin:14px 0 6px}
-.fpd-opt{font-weight:400;color:var(--muted)}
-.fpd-card input,.fpd-card select,.fpd-card textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-size:15px;background:#fff;color:var(--ink);font-family:inherit}
-.fpd-card textarea{min-height:80px;resize:vertical}
-.fpd-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media (max-width:560px){.fpd-row2{grid-template-columns:1fr}}
-.fpd-choices{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
-.fpd-chip{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 13px;font-size:13.5px;cursor:pointer;user-select:none;display:inline-block}
-.fpd-chip.sel{background:var(--deep);border-color:var(--deep);color:#fff}
-.fpd-err,.fpd-servererr{color:#b3432f;font-size:13px;margin-top:6px}
-.fpd-servererr{background:#fbe9e5;border:1px solid #e3b4a7;border-radius:8px;padding:10px 12px;margin-bottom:14px}
-.fpd-nav{display:flex;justify-content:space-between;margin-top:26px;gap:10px}
-.fpd-wrap button,.fpd-wrap a.fpd-primary{font-family:inherit;cursor:pointer;border:none;border-radius:999px;padding:12px 22px;font-size:14.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
-.fpd-primary{background:var(--deep);color:#fff}
-.fpd-primary:disabled{opacity:.6;cursor:default}
-.fpd-ghost{background:transparent;color:var(--deep);border:1px solid var(--line)}
-.fpd-ghost:disabled{opacity:.35;cursor:default}
-.fpd-review{display:grid;grid-template-columns:40% 60%;gap:8px 10px;font-size:13.5px;margin:16px 0}
-.fpd-review dt{color:var(--muted)}
-.fpd-review dd{margin:0;font-weight:600}
-.fpd-confirm{max-width:560px;margin:60px auto;padding:0 20px;text-align:center}
-.fpd-code{font-family:Georgia,serif;font-size:30px;letter-spacing:.06em;background:var(--ivory);border:2px dashed var(--deep);border-radius:12px;padding:18px 10px;margin:18px 0;color:var(--deep2);font-weight:700}
-.fpd-small{font-size:12.5px;color:var(--muted)}
-.fpd-footnote{text-align:center;color:var(--muted);font-size:12.5px;padding:24px 20px 50px}
-`;
