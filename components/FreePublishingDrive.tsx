@@ -107,14 +107,14 @@ export default function FreePublishingDrive(){
   }
 
   return <main className="content-section page-content book-start">
-    <p className="eyebrow">A FREE PUBLISHING INITIATIVE</p>
-    <h1>We're opening 100 free self-publishing slots.</h1>
-    <p className="lead">Publishing shouldn't cost a writer their savings. We're starting with 100 authors — no publishing fee, no catch — because we believe the next great book shouldn't stay unwritten over money.</p>
+    <p className="eyebrow">FOR WRITERS WHO WERE WAITING FOR THIS</p>
+    <h1>Your book has been waiting long enough.</h1>
+    <p className="lead">Finishing a manuscript is hard enough without wondering how you'll ever afford to publish it. For the next 100 writers who apply, we're taking that question off the table completely — no publishing fee, no hidden cost, no catch. Just your story, made real.</p>
 
     <div className="three-col" style={{margin:'28px 0 40px'}}>
-      <article className="journey-card"><Sparkles size={25}/><h3>No publishing fee</h3><p>Your manuscript becomes a real, purchasable book — on us.</p></article>
-      <article className="journey-card"><BookOpen size={25}/><h3>You keep your rights</h3><p>It's your book, your name, your royalties.</p></article>
-      <article className="journey-card"><ShieldCheck size={25}/><h3>A real production team</h3><p>Editing guidance, cover design and a proper print/ebook release.</p></article>
+      <article className="journey-card"><Sparkles size={25}/><h3>Nothing to pay</h3><p>The cost of publishing your book is ours to carry, not yours — from edit to finished copy.</p></article>
+      <article className="journey-card"><BookOpen size={25}/><h3>It stays yours</h3><p>Your name on the cover, your rights in your hands, your royalties in your account.</p></article>
+      <article className="journey-card"><ShieldCheck size={25}/><h3>Done properly</h3><p>Real editing, real cover design, a real print and ebook release — not a shortcut.</p></article>
     </div>
 
     <ol className="journey-progress" style={{gridTemplateColumns:'repeat(6,1fr)'}}>
@@ -208,6 +208,6 @@ export default function FreePublishingDrive(){
         <button className="primary" disabled={busy}>{busy?'Submitting…':step===STEP_LABELS.length-1?'Submit application':'Continue'}<ArrowRight size={16}/></button>
       </div>
     </form>
-    <p className="muted" style={{textAlign:'center',marginTop:20,fontSize:13}}>This application reserves your place in line. It is not a payment, a purchase, or a guarantee of publication timeline.</p>
+    <p className="muted" style={{textAlign:'center',marginTop:20,fontSize:13}}>This just reserves your place in line — no payment, no obligation, and no fixed publishing date yet. We'll be in touch.</p>
   </main>
 }
