@@ -31,6 +31,7 @@ export async function POST(req:Request){
     const extrasWanted=Array.isArray(b.extrasWanted)?b.extrasWanted.map((x:any)=>clean(x,40)).filter(Boolean).slice(0,10):[];
     const extrasOther=clean(b.extrasOther,150);
     const note=clean(b.note,500);
+    if(b.consent!==true)throw Error('Please agree to be contacted about your application');
 
     const ip=req.headers.get('cf-connecting-ip')||'unknown';
     const bucketId=await digest('leads|ip|'+ip);
@@ -47,15 +48,18 @@ export async function POST(req:Request){
     }
     if(!accessCode)throw Error('Could not generate a code. Please try again.');
 
-    const data={name,phone,email,country,state,city,pin,howHeard,howHeardOther,handle,genre,language,stage,completionTime,booksPlanned,authorCopies,extrasWanted,extrasOther,note,code:accessCode,source:'free-publishing-landing'};
+    const data={name,phone,email,country,state,city,pin,howHeard,howHeardOther,handle,genre,language,stage,completionTime,booksPlanned,authorCopies,extrasWanted,extrasOther,note,code:accessCode,source:'free-publishing-landing',consentAt:new Date().toISOString()};
     const id=crypto.randomUUID();
     const iso=new Date().toISOString();
     await db().prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,1)').bind(id,'lead-public','Leads','New',JSON.stringify(data),iso,iso).run();
     waitUntil((async()=>{
       try{
-        const syncedToZoho=await pushLeadToZoho(data);
-        if(syncedToZoho)await db().prepare("UPDATE records SET data=json_set(data,'$.zohoSynced',1) WHERE id=?").bind(id).run();
-      }catch{}
+        const result=await pushLeadToZoho(data);
+        if(result===true)await db().prepare("UPDATE records SET data=json_set(data,'$.zohoSynced',1) WHERE id=?").bind(id).run();
+        else await db().prepare("UPDATE records SET data=json_set(data,'$.zohoSynced',0,'$.zohoError',?) WHERE id=?").bind(result,id).run();
+      }catch(error:any){
+        try{await db().prepare("UPDATE records SET data=json_set(data,'$.zohoSynced',0,'$.zohoError',?) WHERE id=?").bind(String(error?.message||error).slice(0,200),id).run()}catch{}
+      }
     })());
 
     return json({ok:true,code:accessCode});
