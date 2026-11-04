@@ -1,7 +1,8 @@
 import {env} from 'cloudflare:workers';import {books} from '../../../lib/catalogue';import sanitize from 'sanitize-html';import {getApplicationUser} from '../../../lib/author-auth';
 export const dynamic='force-dynamic';
 const json=(v:any,s=200)=>Response.json(v,{status:s,headers:{'Cache-Control':'no-store'}});
-async function identity(){const u=await getApplicationUser();if(!u)throw new Error('Sign in required');await env.DB!.prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(u.userId,u.email,'author').run();const m=await env.DB!.prepare('SELECT role FROM members WHERE id=?').bind(u.userId).first<any>();return {...u,role:u.authMethod==='password'?'author':m?.role||'author'}}
+async function identity(){const u=await getApplicationUser();if(!u)throw new Error('Sign in required');await env.DB!.prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(u.userId,u.email,'author').run();const m=await env.DB!.prepare('SELECT role FROM members WHERE id=?').bind(u.userId).first<any>();const googleList=(k:string)=>String((env as any)[k]||'').split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);const googleRole=googleList('ADMIN_EMAILS').includes(u.email.toLowerCase())?'admin':googleList('STAFF_EMAILS').includes(u.email.toLowerCase())?'staff':'author';
+return {...u,role:u.authMethod==='password'?'author':u.authMethod==='google'?googleRole:m?.role||'author'}}
 const admin=(u:any)=>['admin','staff'].includes(u.role);
 async function throttle(owner:string,kind:string,max:number){const row=await env.DB!.prepare('SELECT COUNT(*) AS n FROM records WHERE owner=? AND kind=? AND created>=?').bind(owner,kind,new Date(Date.now()-3600000).toISOString()).first<any>();if(Number(row?.n)>=max)throw new Error('You are doing that too often. Please wait a while and try again.')}
 function isbn(s:string){const a=s.replace(/[- ]/g,'');return /^97[89]\d{10}$/.test(a)&&[...a].reduce((n,d,i)=>n+Number(d)*(i%2?3:1),0)%10===0}

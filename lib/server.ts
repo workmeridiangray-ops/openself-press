@@ -1,8 +1,11 @@
 import {env} from 'cloudflare:workers';
 import {getApplicationUser} from './author-auth';
+// Kept local (not imported) so test harnesses that stub author-auth keep working.
+const emailList=(k:string)=>String((env as any)[k]||'').split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+const googleRole=(email:string)=>emailList('ADMIN_EMAILS').includes(String(email).toLowerCase())?'admin':emailList('STAFF_EMAILS').includes(String(email).toLowerCase())?'staff':null;
 export const db=()=>env.DB!;export const secrets=()=>env as any;
 export const reply=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
-export async function user(){const u=await getApplicationUser();if(!u)throw Error('Sign in required');await db().prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(u.userId,u.email,'author').run();const m=await db().prepare('SELECT role FROM members WHERE id=?').bind(u.userId).first<any>();return {...u,role:u.authMethod==='password'?'author':m?.role||'author'}}
+export async function user(){const u=await getApplicationUser();if(!u)throw Error('Sign in required');await db().prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(u.userId,u.email,'author').run();const m=await db().prepare('SELECT role FROM members WHERE id=?').bind(u.userId).first<any>();return {...u,role:u.authMethod==='password'?'author':u.authMethod==='google'?(googleRole(u.email)||'author'):m?.role||'author'}}
 export const isStaff=(u:any)=>['staff','admin'].includes(u.role);
 export function staff(u:any,adminOnly=false){if(adminOnly?u.role!=='admin':!isStaff(u))throw Error('Staff access required')}
 export async function record(id:string,u?:any){const r=await db().prepare('SELECT * FROM records WHERE id=?').bind(id).first<any>();if(!r||u&&r.owner!==u.userId&&!isStaff(u))throw Error('Record not found');return {...r,data:JSON.parse(r.data)}}
