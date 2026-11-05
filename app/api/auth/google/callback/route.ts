@@ -1,5 +1,5 @@
 import {env} from 'cloudflare:workers';
-import {digest,GOOGLE_SSO,googleRole,issueSession,rateLimit,sessionCookie} from '../../../../../lib/author-auth';
+import {digest,GOOGLE_SSO,googleRole,issueSession,rateLimit,saveSignup,sessionCookie,signupPhone} from '../../../../../lib/author-auth';
 export const dynamic='force-dynamic';
 
 const isDev=(url:URL)=>['localhost','127.0.0.1'].includes(url.hostname);
@@ -12,7 +12,7 @@ export async function GET(req:Request){
   const url=new URL(req.url);
   const e=env as any;
   const db=env.DB!;
-  const fail=(message:string)=>new Response(null,{status:302,headers:{Location:url.origin+'/admin/login?error='+encodeURIComponent(message),'Set-Cookie':clearCookie(url),'Cache-Control':'no-store'}});
+  const fail=(message:string)=>new Response(null,{status:302,headers:{Location:url.origin+'/login?error='+encodeURIComponent(message),'Set-Cookie':clearCookie(url),'Cache-Control':'no-store'}});
   try{
     if(url.searchParams.get('error'))return fail('Google sign-in was cancelled.');
     const code=url.searchParams.get('code')||'',state=url.searchParams.get('state')||'';
@@ -33,7 +33,7 @@ export async function GET(req:Request){
     if(!issuerOk||payload.aud!==e.GOOGLE_CLIENT_ID||Number(payload.exp)*1000<Date.now()||payload.email_verified!==true||!payload.email)return fail('Google could not verify this account.');
 
     const email=String(payload.email).toLowerCase();
-    if(!googleRole(email))return fail('This Google account is not registered as an admin or staff member.');
+    const staffRole=googleRole(email);
 
     const displayName=String(payload.name||email).slice(0,120);
     const now=new Date().toISOString();
@@ -44,8 +44,9 @@ export async function GET(req:Request){
         db.prepare('INSERT INTO author_accounts VALUES(?,?,?,?,?,?,1,?,?)').bind(crypto.randomUUID(),memberId,email,displayName,GOOGLE_SSO,now,now,now),
         db.prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(memberId,email,'author'),
       ]);
-    }else if(account.password_hash!==GOOGLE_SSO){
-      // Google has proved this person owns the email, so any password set on it before is removed.
+    }else if(account.password_hash!==GOOGLE_SSO&&(staffRole||!account.verified_at)){
+      // Admin/staff emails, and accounts whose email was never verified, are taken over: Google has proved
+      // who owns the email, so any password set on it before is removed. Verified author accounts are simply linked.
       await db.batch([
         db.prepare('UPDATE author_accounts SET password_hash=?,verified_at=?,auth_version=auth_version+1,updated=? WHERE id=?').bind(GOOGLE_SSO,now,now,account.id),
         db.prepare('DELETE FROM author_sessions WHERE account_id=?').bind(account.id),
@@ -53,10 +54,13 @@ export async function GET(req:Request){
     }
     account=await db.prepare('SELECT * FROM author_accounts WHERE email=?').bind(email).first<any>();
 
-    const token=await issueSession(account,1);
-    await db.prepare('INSERT INTO activity VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),'account-'+account.member_id,email,'Staff signed in with Google',now).run();
-    const headers=new Headers({Location:url.origin+'/admin/overview','Cache-Control':'no-store'});
-    headers.append('Set-Cookie',sessionCookie(req,token,1));
+    const days=staffRole?1:7;
+    await saveSignup(account.member_id,{name:account.display_name,email,method:'google'});
+    const hasPhone=!!(await signupPhone(account.member_id));
+    const token=await issueSession(account,days);
+    await db.prepare('INSERT INTO activity VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),'account-'+account.member_id,email,staffRole?'Staff signed in with Google':'Signed in with Google',now).run();
+    const headers=new Headers({Location:url.origin+(staffRole?'/admin/overview':hasPhone?'/workspace/books':'/account?phone=1'),'Cache-Control':'no-store'});
+    headers.append('Set-Cookie',sessionCookie(req,token,days));
     headers.append('Set-Cookie',clearCookie(url));
     return new Response(null,{status:302,headers});
   }catch{

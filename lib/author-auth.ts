@@ -20,6 +20,17 @@ export async function localAccount(){const h=await headers();return sessionAccou
 // Staff sign in with Google. Their author_accounts row carries this marker instead of a
 // password hash, so password login can never match it.
 export const GOOGLE_SSO='google-sso';
+export const validPhone=(v:any)=>/^\+?[\d ()-]{10,18}$/.test(String(v||'').trim());
+// One sign-up record per person (name, email, phone) so staff can see everyone who has an account.
+export async function saveSignup(memberId:string,fields:{name?:string,email?:string,phone?:string,method?:string}){
+  const id='signup-'+memberId,now=new Date().toISOString();
+  const prior=await database().prepare('SELECT data FROM records WHERE id=?').bind(id).first<any>();
+  const old=prior?JSON.parse(prior.data):{};
+  const data:any={...old};for(const [k,v] of Object.entries(fields))if(v!==undefined&&v!=='')data[k]=v;
+  data.title=data.name||data.email||'';data.author=data.name||'';data.lastLogin=now;
+  await database().prepare("INSERT INTO records VALUES(?,?,'Signups','Active',?,?,?,1) ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated=excluded.updated,version=version+1").bind(id,memberId,JSON.stringify(data),now,now).run();
+}
+export async function signupPhone(memberId:string):Promise<string>{const r=await database().prepare('SELECT data FROM records WHERE id=?').bind('signup-'+memberId).first<any>();return r?String(JSON.parse(r.data).phone||''):''}
 const emailList=(value:any)=>String(value||'').split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
 /** Role granted to a Google sign-in, from the ADMIN_EMAILS / STAFF_EMAILS secrets. Removing an email revokes access on the next request. */
 export function googleRole(email:string,source:any=env):'admin'|'staff'|null{const e=String(email||'').toLowerCase();if(!e)return null;if(emailList(source.ADMIN_EMAILS).includes(e))return 'admin';if(emailList(source.STAFF_EMAILS).includes(e))return 'staff';return null}

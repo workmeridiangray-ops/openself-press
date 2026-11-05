@@ -89,13 +89,27 @@ flow=await begin();res=await finish(flow);
 who=await me(sessionFrom(res));
 assert.equal(who.body.user.role,'staff');
 
-// A Google account that is not listed is refused and nothing is created.
-const before=accounts();
-tokenReply=()=>({ok:true,json:async()=>({id_token:idToken({email:'stranger@example.test'})})});
+// Anyone with a verified Google account can sign in: an ordinary author, never staff or admin.
+tokenReply=()=>({ok:true,json:async()=>({id_token:idToken({email:'reader@example.test',name:'Reader One'})})});
 flow=await begin();res=await finish(flow);
-assert.match(errorOf(res),/not registered/);
-assert.equal(sessionFrom(res),'');
-assert.equal(accounts(),before);
+assert.equal(new URL(res.headers.get('location')).pathname+new URL(res.headers.get('location')).search,'/account?phone=1');
+const readerCookie=sessionFrom(res);assert.ok(readerCookie);
+who=await me(readerCookie);assert.equal(who.body.user.role,'author');
+// Phone is collected after the first Google login and stored for staff.
+const savePhone=(cookie,phone)=>auth.POST(new Request(origin+'/api/auth',{method:'POST',headers:{origin,cookie,'Content-Type':'application/json','cf-connecting-ip':'203.0.113.50'},body:JSON.stringify({action:'save-phone',phone})}));
+assert.equal((await savePhone(readerCookie,'abc')).status,400);
+assert.equal((await savePhone(readerCookie,'+91 98765 43210')).status,200);
+const signup=JSON.parse(database.prepare("SELECT data FROM records WHERE kind='Signups' AND json_extract(data,'$.email')='reader@example.test'").get().data);
+assert.equal(signup.name,'Reader One');assert.equal(signup.phone,'+91 98765 43210');assert.equal(signup.method,'google');
+// Second login goes straight to the workspace.
+flow=await begin();res=await finish(flow);
+assert.equal(new URL(res.headers.get('location')).pathname,'/workspace/books');
+
+// A verified password account is linked (password kept); an unverified one is taken over.
+database.prepare("INSERT INTO author_accounts VALUES('acc-v','author-v','verified@example.test','Verified','scrypt$16384$8$5$00$00','t',1,'t','t')").run();
+tokenReply=()=>({ok:true,json:async()=>({id_token:idToken({email:'verified@example.test',name:'Verified'})})});
+flow=await begin();res=await finish(flow);assert.ok(sessionFrom(res));
+assert.equal(database.prepare("SELECT password_hash FROM author_accounts WHERE id='acc-v'").get().password_hash,'scrypt$16384$8$5$00$00');
 
 // Wrong state, wrong audience, unverified email and expired tokens are refused.
 tokenReply=()=>({ok:true,json:async()=>({id_token:idToken()})});
