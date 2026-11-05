@@ -18,11 +18,14 @@ async function accessToken(){
 }
 
 // Fire-and-forget style: callers should never let a Zoho failure block the
-// local signup/order flow. Returns true/false so the caller can log it.
-export async function pushLeadToZoho(lead:any):Promise<boolean>{
+// local signup/order flow. Returns true on success, otherwise a short reason the
+// caller stores on the lead so staff can see why it did not reach the CRM.
+export async function pushLeadToZoho(lead:any):Promise<true|string>{
   try{
+    const e=env as any;
+    if(!e.ZOHO_CLIENT_ID||!e.ZOHO_CLIENT_SECRET||!e.ZOHO_REFRESH_TOKEN)return 'Zoho is not configured';
     const token=await accessToken();
-    if(!token)return false;
+    if(!token)return 'Could not get a Zoho access token';
     const description=[
       'Free publishing program application (MP100).',
       'Access code: '+lead.code,
@@ -66,8 +69,10 @@ export async function pushLeadToZoho(lead:any):Promise<boolean>{
       body:JSON.stringify(payload),
       signal:AbortSignal.timeout(10000),
     });
-    return response.ok;
-  }catch{
-    return false;
+    if(response.ok)return true;
+    const detail=(await response.text().catch(()=>'')).replace(/\s+/g,' ').slice(0,200);
+    return 'Zoho rejected the lead (HTTP '+response.status+')'+(detail?': '+detail:'');
+  }catch(error:any){
+    return 'Zoho request failed: '+String(error?.message||error).slice(0,120);
   }
 }

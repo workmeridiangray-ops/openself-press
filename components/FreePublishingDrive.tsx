@@ -15,9 +15,9 @@ const STEP_LABELS=['About you','Your location','How you found us','Your manuscri
 type FormState={
   name:string;phone:string;email:string;country:string;state:string;city:string;pin:string;
   howHeard:string;howHeardOther:string;handle:string;genre:string;language:string;stage:string;
-  completionTime:string;booksPlanned:string;authorCopies:string;extrasWanted:string[];extrasOther:string;note:string;
+  completionTime:string;booksPlanned:string;authorCopies:string;extrasWanted:string[];extrasOther:string;note:string;consent:boolean;
 };
-const empty:FormState={name:'',phone:'',email:'',country:'India',state:'',city:'',pin:'',howHeard:'',howHeardOther:'',handle:'',genre:'',language:'',stage:'',completionTime:'',booksPlanned:'',authorCopies:'',extrasWanted:[],extrasOther:'',note:''};
+const empty:FormState={name:'',phone:'',email:'',country:'India',state:'',city:'',pin:'',howHeard:'',howHeardOther:'',handle:'',genre:'',language:'',stage:'',completionTime:'',booksPlanned:'',authorCopies:'',extrasWanted:[],extrasOther:'',note:'',consent:false};
 
 export default function FreePublishingDrive(){
   const [step,setStep]=useState(0);
@@ -73,6 +73,7 @@ export default function FreePublishingDrive(){
       setStep(step+1);
       return;
     }
+    if(!f.consent){setErrors({consent:true});return}
     setBusy(true);setServerError('');
     try{
       const r=await fetch('/api/leads',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...f,authorCopies:Number(f.authorCopies)})});
@@ -214,6 +215,8 @@ export default function FreePublishingDrive(){
           <div><dt>Extras requested</dt><dd>{f.extrasWanted.join(', ')||'None'}</dd></div>
           {f.note&&<div><dt>Note</dt><dd>{f.note}</dd></div>}
         </dl>
+        <label className="checkbox" style={{marginTop:16}}><input type="checkbox" checked={f.consent} onChange={e=>set('consent',e.target.checked)}/>I agree that the publishing team may store these details and contact me by phone, email or WhatsApp about this application.</label>
+        {errors.consent&&<small style={{color:'#b3432f'}}>Please tick this box to submit your application.</small>}
       </>}
 
       <div className="journey-actions">

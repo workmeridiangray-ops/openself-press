@@ -1,8 +1,11 @@
 import {env} from 'cloudflare:workers';
 import {getApplicationUser} from './author-auth';
+// Kept local (not imported) so test harnesses that stub author-auth keep working.
+const emailList=(k:string)=>String((env as any)[k]||'').split(/[\s,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+const googleRole=(email:string)=>emailList('ADMIN_EMAILS').includes(String(email).toLowerCase())?'admin':emailList('STAFF_EMAILS').includes(String(email).toLowerCase())?'staff':null;
 export const db=()=>env.DB!;export const secrets=()=>env as any;
 export const reply=(data:any,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
-export async function user(){const u=await getApplicationUser();if(!u)throw Error('Sign in required');await db().prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(u.userId,u.email,'author').run();const m=await db().prepare('SELECT role FROM members WHERE id=?').bind(u.userId).first<any>();return {...u,role:u.authMethod==='password'?'author':m?.role||'author'}}
+export async function user(){const u=await getApplicationUser();if(!u)throw Error('Sign in required');await db().prepare('INSERT OR IGNORE INTO members VALUES(?,?,?)').bind(u.userId,u.email,'author').run();const m=await db().prepare('SELECT role FROM members WHERE id=?').bind(u.userId).first<any>();return {...u,role:u.authMethod==='password'?'author':u.authMethod==='google'?(googleRole(u.email)||'author'):m?.role||'author'}}
 export const isStaff=(u:any)=>['staff','admin'].includes(u.role);
 export function staff(u:any,adminOnly=false){if(adminOnly?u.role!=='admin':!isStaff(u))throw Error('Staff access required')}
 export async function record(id:string,u?:any){const r=await db().prepare('SELECT * FROM records WHERE id=?').bind(id).first<any>();if(!r||u&&r.owner!==u.userId&&!isStaff(u))throw Error('Record not found');return {...r,data:JSON.parse(r.data)}}
@@ -14,6 +17,7 @@ export async function change(r:any,status:string,data:any){const result=await up
 export async function audit(id:string,actor:string,action:string){await db().prepare('INSERT INTO activity VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,actor,action,new Date().toISOString()).run()}
 export async function notify(owner:string,title:string,message:string,recordId:string,email?:string,id?:string){if(!email){email=(await db().prepare('SELECT email FROM members WHERE id=?').bind(owner).first<any>())?.email}const notificationId=await create(owner,'Notifications','Unsent',{title,message,recordId,email:email||''},id);if(secrets().RESEND_API_KEY&&secrets().EMAIL_FROM){try{const {sendNotification}=await import('./providers');await sendNotification(await record(notificationId))}catch{}}return notificationId}
 export async function settings(){try{return (await record('site-config')).data}catch{return {brand:'Open Shelf Press',businessName:'',contactEmail:'',address:'',policies:{},launchReady:false}}}
+export async function throttle(owner:string,kind:string,max:number,windowMs=3600000){const row=await db().prepare('SELECT COUNT(*) AS n FROM records WHERE owner=? AND kind=? AND created>=?').bind(owner,kind,new Date(Date.now()-windowMs).toISOString()).first<any>();if(Number(row?.n)>=max){const e:any=Error('You are doing that too often. Please wait a while and try again.');e.status=429;throw e}}
 export function origin(req:Request){if(req.headers.get('origin')&&req.headers.get('origin')!==new URL(req.url).origin)throw Error('Invalid request origin')}
 
 export async function markInvoicePaid(orderId:string,reference:string){await db().prepare("UPDATE records SET status='Paid',data=json_set(data,'$.paymentReference',?),updated=?,version=version+1 WHERE id=? AND kind='Invoices'").bind(reference,new Date().toISOString(),'invoice-'+orderId).run()}

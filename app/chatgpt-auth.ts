@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -18,7 +19,18 @@ const SIGN_IN_PATH = "/signin-with-chatgpt";
 const SIGN_OUT_PATH = "/signout-with-chatgpt";
 const CALLBACK_PATH = "/callback";
 
+// The oai-authenticated-user-* headers are only trustworthy when a gateway in
+// front of this Worker sets them and strips client-supplied copies. On a
+// directly reachable Worker anyone could send them and impersonate any user,
+// including the owner. Set TRUST_PLATFORM_AUTH=1 only for deployments that sit
+// behind that gateway; local dev (Vite plugin) is trusted automatically.
+function platformHeadersTrusted(): boolean {
+  if (import.meta.env?.DEV) return true;
+  return (env as { TRUST_PLATFORM_AUTH?: string }).TRUST_PLATFORM_AUTH === "1";
+}
+
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
+  if (!platformHeadersTrusted()) return null;
   const requestHeaders = await headers();
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);
