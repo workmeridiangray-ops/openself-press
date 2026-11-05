@@ -21,7 +21,7 @@ export default function ContactForm(){
     finally{setBusy(false)}
   }
 
-  if(sent)return <section className="panel receipt"><CheckCircle2 size={40}/><h2>Message received</h2><p>Thank you. The publishing team will reply to the email address you gave.</p></section>;
+  if(sent)return <section className="panel receipt"><CheckCircle2 size={40}/><h2>Message received</h2><p>Thank you. The publishing team will reply to the email address you gave. You can also write to info@openshelfpress.com.</p></section>;
 
   return <form className="panel" onSubmit={submit}>
     <div className="form-grid">
