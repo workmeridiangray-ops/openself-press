@@ -1,5 +1,6 @@
 import {env,waitUntil} from 'cloudflare:workers';
 import {pushLeadToZoho} from '../../../lib/zoho';
+import {sendMail,staffEmail} from '../../../lib/author-auth';
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 const json=(v:any,s=200)=>Response.json(v,{status:s,headers:{'Cache-Control':'no-store'}});
@@ -62,6 +63,8 @@ export async function POST(req:Request){
       }
     })());
 
+    await sendMail(email,'Your free publishing code: '+accessCode,'Hi '+name+',\n\nThanks for applying to the free publishing programme. Your access code is:\n\n    '+accessCode+'\n\nKeep it safe. Log in or create an account, then enter the code when you start your book. This only reserves your place: no payment, no obligation.');
+    await sendMail(staffEmail(),'New free-publishing application: '+name,name+'\n'+email+'\n'+phone+'\n'+city+', '+state+'\nGenre: '+genre+' | Stage: '+stage+'\nCode: '+accessCode);
     return json({ok:true,code:accessCode});
   }catch(e:any){return json({error:e.message||'Unable to submit your application'},e.status||400)}
 }

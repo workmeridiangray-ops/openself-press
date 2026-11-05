@@ -1,5 +1,5 @@
 import {env} from 'cloudflare:workers';
-import {digest,GOOGLE_SSO,googleRole,issueSession,rateLimit,saveSignup,sessionCookie,signupPhone} from '../../../../../lib/author-auth';
+import {digest,GOOGLE_SSO,googleRole,issueSession,rateLimit,saveSignup,sendMail,loginNotice,staffEmail,sessionCookie,signupPhone} from '../../../../../lib/author-auth';
 export const dynamic='force-dynamic';
 
 const isDev=(url:URL)=>['localhost','127.0.0.1'].includes(url.hostname);
@@ -38,7 +38,9 @@ export async function GET(req:Request){
     const displayName=String(payload.name||email).slice(0,120);
     const now=new Date().toISOString();
     let account=await db.prepare('SELECT * FROM author_accounts WHERE email=?').bind(email).first<any>();
+    let created=false;
     if(!account){
+      created=true;
       const memberId='google-'+digest(email).slice(0,32);
       await db.batch([
         db.prepare('INSERT INTO author_accounts VALUES(?,?,?,?,?,?,1,?,?)').bind(crypto.randomUUID(),memberId,email,displayName,GOOGLE_SSO,now,now,now),
@@ -55,6 +57,7 @@ export async function GET(req:Request){
     account=await db.prepare('SELECT * FROM author_accounts WHERE email=?').bind(email).first<any>();
 
     const days=staffRole?1:7;
+    if(created){await sendMail(email,'Welcome to Open Shelf Press','Hi '+displayName+',\n\nYour account is ready. You can start a book, submit a manuscript or apply for the free publishing programme any time.\n\nOpen your studio: '+url.origin+'/workspace/books');if(!staffRole)await sendMail(staffEmail(),'New sign-up: '+displayName,displayName+' ('+email+') signed up with Google.')}else await loginNotice(account,'Google');
     await saveSignup(account.member_id,{name:account.display_name,email,method:'google'});
     const hasPhone=!!(await signupPhone(account.member_id));
     const token=await issueSession(account,days);

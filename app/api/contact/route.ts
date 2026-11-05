@@ -1,4 +1,6 @@
 import {env} from 'cloudflare:workers';
+const STAFF=()=>String((env as any).STAFF_NOTIFY_EMAIL||'info@openshelfpress.com');
+const mail=async(to:string,subject:string,text:string)=>{try{const e:any=env;if(!e.RESEND_API_KEY||!e.EMAIL_FROM||!/^\S+@\S+\.\S+$/.test(String(to||'')))return;await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(8000),headers:{Authorization:'Bearer '+e.RESEND_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({from:e.EMAIL_FROM,to:[to],subject,text:text+'\n\n— Open Shelf Press\nQuestions? Write to info@openshelfpress.com'})})}catch{}};
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 const json=(v:any,s=200)=>Response.json(v,{status:s,headers:{'Cache-Control':'no-store'}});
@@ -37,6 +39,8 @@ export async function POST(req:Request){
     const data={title:subject,author:name,name,email,phone,message,source:'contact-page'};
     await db().prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,1)').bind(id,'enquiry-public','Enquiries','New',JSON.stringify(data),iso,iso).run();
     await db().prepare('INSERT INTO activity VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,email,'Website enquiry received',iso).run();
+    await mail(email,'We received your message','Hi '+name+',\n\nThanks for writing in. We have your message ("'+subject+'") and will reply to this email address soon.');
+    await mail(STAFF(),'New enquiry: '+subject,name+'\n'+email+(phone?'\n'+phone:'')+'\n\n'+message);
     return json({ok:true,id});
   }catch(e:any){return json({error:e.message||'Unable to send your message'},e.status||400)}
 }
