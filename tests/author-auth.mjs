@@ -23,4 +23,20 @@ platformUser={userId:'legacy-author',email:'legacy@example.test',displayName:'Le
 platformUser={userId:'staff-owner',email:'staff@example.test',displayName:'Owner'};database.prepare('INSERT INTO members VALUES(?,?,?)').run(platformUser.userId,platformUser.email,'admin');jar='';await post({action:'register',name:'Staff',email:'staff@example.test',phone:'+91 9876543210',password:pass,linkExisting:true},400);platformUser=null;await post({action:'register',name:'Hijack',email:'legacy@example.test',phone:'+91 9876543210',password:pass,linkExisting:true},400);context('');eq(await helpers.getApplicationUser(),null);
 for(let i=0;i<10;i++)await post({action:'login',email:'rate@example.test',password:pass},401);await post({action:'login',email:'rate@example.test',password:pass},429);
 eq(helpers.safeNext('/\\evil.test'),'/workspace/books');eq(helpers.safeNext('/api/platform'),'/workspace/books');eq(helpers.safeNext('/workspace/books'),'/workspace/books');eq(helpers.readSessionToken('__Host-mp_author=not-a-token','auth.test'),'');eq(helpers.readSessionToken('mp_author_dev='+('a'.repeat(64)),'auth.test'),'');
+{const call=(body,ip)=>auth.POST(new Request('https://auth.test/api/auth',{method:'POST',headers:{origin:'https://auth.test','Content-Type':'application/json','cf-connecting-ip':ip},body:JSON.stringify(body)}));
+const reg=(email,ip)=>call({action:'register',name:'Gated Person',email,phone:'+91 9876543210',password:pass},ip);
+const start=messages.length;
+const a=await reg('gated@example.test','198.51.100.71');const aj=await a.json();
+eq(a.status,200);eq(aj.pending,true);eq(a.headers.get('set-cookie'),null);
+eq(database.prepare("SELECT verified_at FROM author_accounts WHERE email='gated@example.test'").get().verified_at,null);
+const link=messages.slice(start).find(m=>/#token=/.test(m.text));assert.ok(link);checks++;
+// An address that already has an account gets exactly the same answer, so sign-up cannot be used to look people up.
+const b=await reg('gated@example.test','198.51.100.72');const bj=await b.json();
+eq(b.status,200);eq(JSON.stringify(bj),JSON.stringify(aj));eq(b.headers.get('set-cookie'),null);
+assert.match(messages.at(-1).text,/already exists/);checks++;
+eq(database.prepare("SELECT COUNT(*) AS n FROM author_accounts WHERE email='gated@example.test'").get().n,1);
+// Opening the emailed link confirms the address and signs the person in.
+const v=await call({action:'verify',token:link.text.match(/#token=([a-f0-9]{64})/)[1]},'198.51.100.73');const vj=await v.json();
+eq(v.status,200);eq(vj.next,'/workspace/books');assert.ok(v.headers.get('set-cookie'));checks++;
+assert.ok(database.prepare("SELECT verified_at FROM author_accounts WHERE email='gated@example.test'").get().verified_at);checks++;}
 globalThis.fetch=realFetch;console.log(`${checks} author identity, password, session, recovery, linking, CSRF and access checks passed (emails mocked)`);
