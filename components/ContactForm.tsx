@@ -1,6 +1,7 @@
 'use client';
 import React,{useState} from 'react';
 import {ArrowRight,CheckCircle2} from 'lucide-react';
+import PhoneInput from './PhoneInput';
 
 export default function ContactForm(){
   const [busy,setBusy]=useState(false);
@@ -27,7 +28,7 @@ export default function ContactForm(){
     <div className="form-grid">
       <label>Your name<input name="name" required maxLength={120} autoComplete="name"/></label>
       <label>Email<input name="email" type="email" required maxLength={200} autoComplete="email"/></label>
-      <label>Phone (optional)<input name="phone" maxLength={20} pattern="[0-9+()\- ]{7,20}" autoComplete="tel"/></label>
+      <label>Phone (optional)<PhoneInput name="phone" required={false}/></label>
       <label>Subject<input name="subject" maxLength={150}/></label>
       <label className="full">Message<textarea name="message" required minLength={10} maxLength={3000} rows={6}/></label>
     </div>

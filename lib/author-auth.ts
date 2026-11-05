@@ -20,7 +20,7 @@ export async function localAccount(){const h=await headers();return sessionAccou
 // Staff sign in with Google. Their author_accounts row carries this marker instead of a
 // password hash, so password login can never match it.
 export const GOOGLE_SSO='google-sso';
-export const validPhone=(v:any)=>/^\+?[\d ()-]{10,18}$/.test(String(v||'').trim());
+export const validPhone=(v:any)=>{const s=String(v||'').trim();const n=s.replace(/\D/g,'').length;return /^\+[\d ()-]+$/.test(s)&&n>=8&&n<=15};
 // One sign-up record per person (name, email, phone) so staff can see everyone who has an account.
 export async function saveSignup(memberId:string,fields:{name?:string,email?:string,phone?:string,method?:string}){
   const id='signup-'+memberId,now=new Date().toISOString();
