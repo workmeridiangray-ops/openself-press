@@ -16,3 +16,7 @@ body{background:var(--paper);color:var(--ink);font-family:'DM Sans',Arial,sans-s
 .google-btn:hover{background:#f8f9fa;box-shadow:0 1px 3px rgba(60,64,67,.3)}
 .google-btn:disabled{opacity:.6;cursor:default}
 .google-btn .google-logo{flex:none}
+
+.phone-input{display:flex;gap:8px;width:100%}
+.phone-input select{flex:0 0 42%;min-width:0}
+.phone-input input[type=tel]{flex:1;min-width:0}

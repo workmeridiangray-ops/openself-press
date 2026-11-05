@@ -1,5 +1,6 @@
 'use client';
 import React,{useState} from 'react';
+import PhoneInput from './PhoneInput';
 import {ArrowLeft,ArrowRight,CheckCircle2,BookOpen,Sparkles,ShieldCheck} from 'lucide-react';
 
 const HOW_HEARD=['Instagram','Threads','Quora','Facebook','WhatsApp','A friend / word of mouth','Other'];
@@ -143,7 +144,7 @@ export default function FreePublishingDrive(){
         <p className="muted">So we know who's applying.</p>
         <div className="form-grid">
           <label className="full">Full name<input value={f.name} maxLength={120} onChange={e=>set('name',e.target.value)} autoComplete="name"/>{errors.name&&<small style={{color:'#b3432f'}}>Please enter your full name.</small>}</label>
-          <label>Phone number<input value={f.phone} maxLength={20} onChange={e=>set('phone',e.target.value)} autoComplete="tel"/>{errors.phone&&<small style={{color:'#b3432f'}}>Please enter a valid phone number.</small>}</label>
+          <label>Phone number<PhoneInput value={f.phone} onChange={v=>set('phone',v)}/>{errors.phone&&<small style={{color:'#b3432f'}}>Please enter a valid phone number.</small>}</label>
           <label>Email address<input value={f.email} maxLength={200} onChange={e=>set('email',e.target.value)} autoComplete="email"/>{errors.email&&<small style={{color:'#b3432f'}}>Please enter a valid email.</small>}</label>
         </div>
       </>}
