@@ -1,6 +1,7 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
+import { googleBooksFeed } from '../lib/google-books-feed';
 
 // Conservative headers for every response. No Content-Security-Policy here on
 // purpose: the app uses inline scripts, Google Fonts and Razorpay checkout, and a
@@ -29,6 +30,8 @@ const worker = {
     ctx.waitUntil(runPrintQueue());
   },
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
+    const bookFeed = await googleBooksFeed(request, env);
+    if (bookFeed) return withSecurityHeaders(request, bookFeed);
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and
     // the auxiliary service binding are absent from production builds.
