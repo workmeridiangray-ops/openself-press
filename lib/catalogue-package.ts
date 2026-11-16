@@ -21,6 +21,13 @@ export function preparePackage(rows:any[],existing:any[]){
     const matches=existing.filter(r=>String(r.data.sku||'').trim().toLowerCase()===sku.toLowerCase());
     if(matches.length>1)throw Error('Multiple listings share this code. Resolve them before updating.');
     const prior=matches[0];
+    if(input.stockOnly===true){
+      if(!prior)throw Error('Stock-only updates require an existing book.');
+      if(String(prior.data.title).trim()!==String(input.title).trim())throw Error('The title does not match the saved book code.');
+      const stock=String(input.stock??'');
+      if(!/^\d+$/.test(stock)||!Number.isSafeInteger(Number(stock))||Number(stock)>1_000_000)throw Error('Stock must be a whole number from 0 to 1,000,000.');
+      return {row:index+1,sku,title:prior.data.title,data:{...prior.data,stock:Number(stock)},prior,cover:null,status:prior.status,stockOnly:true,error:''};
+    }
     if(prior&&(prior.status!=='Draft'||prior.data.bookReference))throw Error('Only direct draft listings can be updated with a package.');
     if(prior&&String(prior.data.title).trim()!==String(input.title).trim())throw Error('The title does not match the saved book code.');
     const cover=packageCover(input.coverData);

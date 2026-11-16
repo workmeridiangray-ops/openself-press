@@ -112,3 +112,15 @@ await post(save({...packaged.data,price:'220'},'Published',{id:packaged.id,versi
 plan=await pkg({action:'preview',rows:packageRows});eq(plan.valid,0);
 const projected=(await storefront()).find(r=>r.id===packaged.id);eq(projected.printingCostPaise,undefined);eq(projected.markupPaise,undefined);
 console.log(`${checks} total catalogue and package checks passed`);
+
+// Inventory-only packages preserve publication state and all other saved metadata.
+const beforeInventory={...packaged.data};
+const stockRows=[{sku:'PKG-1',title:'Package One',stockOnly:true,stock:10,price:'1',isbn:'',author:'Wrong credit'}];
+plan=await pkg({action:'preview',rows:stockRows});eq(plan.valid,1);eq(plan.rows[0].stock,10);
+await pkg({action:'apply',rows:stockRows,versions:{'PKG-1':plan.rows[0].version}});
+packaged=(await all()).find(r=>r.data.sku==='PKG-1');eq(packaged.status,'Published');eq(packaged.data.stock,10);
+for(const key of ['pricePaise','printingCostPaise','markupPaise','coverKey','isbn','author','title'])eq(packaged.data[key],beforeInventory[key]);
+for(const stock of [-1,1.5,1000001]){plan=await pkg({action:'preview',rows:[{...stockRows[0],stock}]});eq(plan.valid,0);}
+plan=await pkg({action:'preview',rows:[{...stockRows[0],sku:'DOES-NOT-EXIST'}]});eq(plan.valid,0);
+plan=await pkg({action:'preview',rows:[{...stockRows[0],title:'Wrong title'}]});eq(plan.valid,0);
+console.log(`${checks} total catalogue, cover and inventory package checks passed`);
