@@ -21,6 +21,13 @@ export function preparePackage(rows:any[],existing:any[]){
     const matches=existing.filter(r=>String(r.data.sku||'').trim().toLowerCase()===sku.toLowerCase());
     if(matches.length>1)throw Error('Multiple listings share this code. Resolve them before updating.');
     const prior=matches[0];
+    if(input.publishOnly===true){
+      if(!prior||prior.data.bookReference||!['Draft','Published'].includes(prior.status))throw Error('Publish an existing direct draft listing. Linked editions retain their production approval process.');
+      if(String(prior.data.title).trim()!==String(input.title).trim())throw Error('The title does not match the saved book code.');
+      if(String(prior.data.author||'').trim().toLowerCase()==='author to be confirmed')throw Error('Confirm the author credit before publishing.');
+      normalizeCatalogueBook({...prior.data,price:(prior.data.pricePaise/100).toFixed(2)},'Published',!!prior.data.coverKey);
+      return {row:index+1,sku,title:prior.data.title,data:{...prior.data},prior,cover:null,status:'Published',publishOnly:true,error:''};
+    }
     if(input.stockOnly===true){
       if(!prior)throw Error('Stock-only updates require an existing book.');
       if(String(prior.data.title).trim()!==String(input.title).trim())throw Error('The title does not match the saved book code.');

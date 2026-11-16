@@ -51,3 +51,5 @@ For artwork-only changes, send `sku`, the matching `title`, `coverData`, and `co
 Inventory-only packages use `stockOnly: true`, `sku`, the matching `title` and a whole-number `stock`. They update existing records, retaining prices, covers, credits, production links and listing status. The preview shows the new stock. Earlier static catalogue entries retain their data and default to 10 copies of ordering availability.
 
 Author-credit packages use `authorOnly: true`, `sku`, matching `title` and `author`. They update direct draft books only, retaining price, stock, covers, ISBNs and all other stored fields. The preview displays the resulting author credit.
+
+Publishing-only packages use `publishOnly: true`, `sku` and matching `title`. Preview validates the saved author, price, cover and book fields. Apply requires explicit sale/cover-rights confirmation and current preview versions. Direct drafts become Published; prices, stock, ISBNs and other metadata are preserved. Linked production editions and archived entries are excluded. Repeating publication is safe. Blank ISBNs stay omitted from public book details.
