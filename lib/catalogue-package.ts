@@ -30,6 +30,12 @@ export function preparePackage(rows:any[],existing:any[]){
     }
     if(prior&&(prior.status!=='Draft'||prior.data.bookReference))throw Error('Only direct draft listings can be updated with a package.');
     if(prior&&String(prior.data.title).trim()!==String(input.title).trim())throw Error('The title does not match the saved book code.');
+    if(input.authorOnly===true){
+      if(!prior)throw Error('Author-only updates require an existing draft book.');
+      const author=String(input.author??'').trim();
+      if(!author||author.length>200)throw Error('Enter an author name of 1 to 200 characters.');
+      return {row:index+1,sku,title:prior.data.title,data:{...prior.data,author},prior,cover:null,status:prior.status,authorOnly:true,error:''};
+    }
     const cover=packageCover(input.coverData);
     if(input.coverOnly===true){
       if(!prior)throw Error('Cover-only updates require an existing draft book.');
