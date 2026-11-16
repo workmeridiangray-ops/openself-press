@@ -124,3 +124,16 @@ for(const stock of [-1,1.5,1000001]){plan=await pkg({action:'preview',rows:[{...
 plan=await pkg({action:'preview',rows:[{...stockRows[0],sku:'DOES-NOT-EXIST'}]});eq(plan.valid,0);
 plan=await pkg({action:'preview',rows:[{...stockRows[0],title:'Wrong title'}]});eq(plan.valid,0);
 console.log(`${checks} total catalogue, cover and inventory package checks passed`);
+
+// Author-only updates change exactly the author credit of direct draft listings.
+await post(save(book({sku:'CREDIT-1',title:'Credit Test'})));
+const creditBook=(await all()).find(r=>r.data.sku==='CREDIT-1');
+const beforeCredit={...creditBook.data};
+const credits=[{sku:'CREDIT-1',title:creditBook.data.title,authorOnly:true,author:'Koko Nest',stock:999,price:'1',isbn:'9780306406157'}];
+plan=await pkg({action:'preview',rows:credits});eq(plan.valid,1);eq(plan.rows[0].author,'Koko Nest');
+await pkg({action:'apply',rows:credits,versions:{'CREDIT-1':plan.rows[0].version}});
+const credited=(await all()).find(r=>r.id===creditBook.id);eq(credited.status,'Draft');eq(credited.data.author,'Koko Nest');
+for(const key of Object.keys(beforeCredit).filter(k=>k!=='author'))eq(credited.data[key],beforeCredit[key]);
+for(const author of ['', 'x'.repeat(201)]){plan=await pkg({action:'preview',rows:[{...credits[0],author}]});eq(plan.valid,0);}
+plan=await pkg({action:'preview',rows:[{...credits[0],sku:'MISSING'}]});eq(plan.valid,0);
+console.log(`${checks} total catalogue package checks passed`);

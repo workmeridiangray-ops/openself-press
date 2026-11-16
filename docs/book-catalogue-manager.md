@@ -49,3 +49,5 @@ Each row contains the standard book fields plus `printingCost` (rupees), `costBa
 For artwork-only changes, send `sku`, the matching `title`, `coverData`, and `coverOnly: true`. This requires an existing direct draft and retains all its saved prices, printing costs, ISBN, stock, author credits and other metadata. It cannot create a new listing.
 
 Inventory-only packages use `stockOnly: true`, `sku`, the matching `title` and a whole-number `stock`. They update existing records, retaining prices, covers, credits, production links and listing status. The preview shows the new stock. Earlier static catalogue entries retain their data and default to 10 copies of ordering availability.
+
+Author-credit packages use `authorOnly: true`, `sku`, matching `title` and `author`. They update direct draft books only, retaining price, stock, covers, ISBNs and all other stored fields. The preview displays the resulting author credit.
