@@ -1,3 +1,16 @@
-import {list,record,settings,reply} from '../../../lib/server';import {books} from '../../../lib/catalogue';
+import {list,record,settings,reply} from '../../../lib/server';
+import {books} from '../../../lib/catalogue';
 export const dynamic='force-dynamic';
-export async function GET(){try{const catalogue=await Promise.all((await list('Catalogue')).filter(r=>r.status==='Published').map(async r=>{let edition:any={};if(r.data.bookReference){try{const source=await record(r.data.bookReference);if(source.kind==='Publishing')edition=source.data}catch{}}return {id:r.id,title:r.data.title,author:r.data.author,genre:r.data.genre,description:r.data.description,tag:r.data.tag,cover:r.data.cover,color:r.data.color,accent:r.data.accent,price:r.data.pricePaise/100,stock:r.data.stock,bookReference:r.data.bookReference,isbn:edition.isbn,language:edition.language,binding:edition.binding,trimSize:edition.trimSize,pageCount:edition.pageCount,publishedAt:edition.publishedAt}}));const config=await settings();return reply({books:catalogue.length?catalogue:config.launchReady?[]:books,sample:!catalogue.length&&!config.launchReady,settings:config})}catch{return reply({books,sample:true,settings:{brand:'Open Shelf Press',launchReady:false}})}}
+export async function GET(){try{
+  const listings=await list('Catalogue');
+  const catalogue=await Promise.all(listings.filter(r=>r.status==='Published').map(async r=>{
+    let edition:any={};
+    if(r.data.bookReference){try{const source=await record(r.data.bookReference);if(source.kind==='Publishing')edition=source.data;}catch{}}
+    const data=r.data;
+    return {id:r.id,title:data.title,subtitle:data.subtitle,author:data.author,genre:data.genre,description:data.description,tag:data.tag,cover:data.cover,color:data.color,accent:data.accent,price:data.pricePaise/100,stock:data.stock,bookReference:data.bookReference,isbn:edition.isbn||data.isbn,language:edition.language||data.language,binding:edition.binding||data.binding,trimSize:edition.trimSize||data.trimSize,pageCount:edition.pageCount||data.pageCount,publishedAt:edition.publishedAt||data.publishedAt};
+  }));
+  const config=await settings();
+  // Once staff manage a catalogue, archiving its last book must not restore built-in books.
+  const sample=!listings.length&&!config.launchReady;
+  return reply({books:sample?books:catalogue,sample,settings:config});
+}catch{return reply({books:[],sample:false,error:'The catalogue is temporarily unavailable.'},503);}}
