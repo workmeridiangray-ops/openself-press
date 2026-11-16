@@ -11,12 +11,14 @@ let identity=null;globalThis.__getUser=async()=>identity;
 const files=new Map();globalThis.__env={DB:{prepare:statement,async batch(queries){database.exec('BEGIN');try{const results=[];for(const q of queries)results.push(await q.run());database.exec('COMMIT');return results;}catch(e){database.exec('ROLLBACK');throw e;}}},BUCKET:{async put(key,bytes,options){files.set(key,{body:bytes,...options});},async get(key){return files.get(key);}}};
 const dir='.sites-runtime/catalogue-tests';mkdirSync(dir,{recursive:true});
 writeFileSync(dir+'/auth.mjs',"import {createHash} from 'node:crypto'; export const getApplicationUser=()=>globalThis.__getUser();export const digest=s=>createHash('sha256').update(s).digest('hex');");
-for(const [name,path] of Object.entries({model:'lib/catalogue-import.ts',server:'lib/server.ts',api:'app/api/admin/catalogue/route.ts',cover:'app/api/catalogue/cover/route.ts',public:'app/api/catalogue/route.ts',platform:'app/api/platform/route.ts'})){
+for(const [name,path] of Object.entries({packageModel:'lib/catalogue-package.ts',packageAPI:'app/api/admin/catalogue/package/route.ts',model:'lib/catalogue-import.ts',server:'lib/server.ts',api:'app/api/admin/catalogue/route.ts',cover:'app/api/catalogue/cover/route.ts',public:'app/api/catalogue/route.ts',platform:'app/api/platform/route.ts'})){
   let source=readFileSync(path,'utf8').replace(/import \{env\} from 'cloudflare:workers';/g,'const env=globalThis.__env;')
     .replace(/from '(?:\.\.\/)*lib\/server'/g,"from './server.mjs'")
     .replace(/from '(?:\.\.\/)*lib\/author-auth'/g,"from './auth.mjs'")
     .replace(/from '\.\/author-auth'/g,"from './auth.mjs'")
     .replace(/from '(?:\.\.\/)*lib\/catalogue-import'/g,"from './model.mjs'")
+    .replace(/from '(?:\.\.\/)*lib\/catalogue-package'/g,"from './packageModel.mjs'")
+    .replace(/from '\.\/catalogue-import'/g,"from './model.mjs'")
     .replace(/import \{books\} from '[^']+';/g,"const books=[{id:'builtin',title:'Built-in book'}];");
   writeFileSync(dir+'/'+name+'.mjs',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText);
 }
@@ -83,3 +85,21 @@ await post(save(book({sku:'LINKED'}),'Published',{id:'linked',version:1}),400);
 eq(database.prepare('SELECT status FROM records WHERE id=?').get('edition').status,'Draft');
 database.prepare("UPDATE records SET status='Archived' WHERE kind='Catalogue'").run();await signIn('author');const blocked=await platformAPI.POST(new Request(origin+'/api/platform',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({action:'create',kind:'Orders',data:{title:'Fallback order',items:[{id:'builtin',qty:1}]}})}));eq(blocked.status,400);eq((await blocked.json()).error,'The bookstore is not open for orders yet.');
 console.log(`${checks} catalogue permissions, CSV, publication, import atomicity, cover and production-boundary checks passed`);
+const packageAPI=await import('../'+dir+'/packageAPI.mjs');
+async function pkg(body,status=200){const r=await packageAPI.POST(new Request(origin+'/api/admin/catalogue/package',{method:'POST',headers:{origin,'Content-Type':'application/json'},body:JSON.stringify(body)}));const d=await r.json();eq(r.status,status);return d;}
+await signIn('author');await pkg({action:'preview',rows:[]},403);await signIn('admin');
+const packageRows=[book({sku:'PKG-1',title:'Package One',price:'208.80',printingCost:'58.80',stock:'0',isbn:'',cover:'',coverData:'data:image/png;base64,'+Buffer.from(png).toString('base64')})];
+let plan=await pkg({action:'preview',rows:packageRows});eq(plan.valid,1);eq((await all()).some(r=>r.data.sku==='PKG-1'),false);
+await pkg({action:'apply',rows:packageRows,versions:{'PKG-1':9}},409);
+result=await pkg({action:'apply',rows:packageRows,versions:{'PKG-1':0}});eq(result.count,1);
+let packaged=(await all()).find(r=>r.data.sku==='PKG-1');eq(packaged.status,'Draft');eq(packaged.data.printingCostPaise,5880);eq(packaged.data.markupPaise,15000);eq(packaged.data.isbn,'');eq(!!packaged.data.coverKey,true);
+const updates=[{...packageRows[0],author:'Changed credit',stock:'999',price:'220',coverData:undefined}];
+plan=await pkg({action:'preview',rows:updates});await pkg({action:'apply',rows:updates,versions:{'PKG-1':plan.rows[0].version}});
+packaged=(await all()).find(r=>r.data.sku==='PKG-1');eq(packaged.data.author,'Test Writer');eq(packaged.data.stock,0);eq(!!packaged.data.coverKey,true);eq((await all()).filter(r=>r.data.sku==='PKG-1').length,1);
+plan=await pkg({action:'preview',rows:[...packageRows,...packageRows]});eq(plan.valid,1);
+for(const bad of [{title:'Wrong title'},{coverData:'data:image/png;base64,PHN2Zz4='},{price:'1'}]){plan=await pkg({action:'preview',rows:[{...packageRows[0],...bad}]});eq(plan.valid,0);}
+plan=await pkg({action:'preview',rows:[book({sku:'LINKED',printingCost:'50'})]});eq(plan.valid,0);
+await post(save({...packaged.data,price:'220'},'Published',{id:packaged.id,version:packaged.version}));
+plan=await pkg({action:'preview',rows:packageRows});eq(plan.valid,0);
+const projected=(await storefront()).find(r=>r.id===packaged.id);eq(projected.printingCostPaise,undefined);eq(projected.markupPaise,undefined);
+console.log(`${checks} total catalogue and package checks passed`);

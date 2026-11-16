@@ -39,3 +39,9 @@ Once a managed catalogue exists, an empty public catalogue stays empty instead o
 - `npm run build`: production bundles including the new admin and cover endpoints.
 
 Live Google login, production storage bindings and browser acceptance should be checked on the deployed environment. No live customer books or orders are created by these tests.
+
+## Prepared draft packages
+
+The admin catalogue's **Update prepared books** panel accepts up to 50 prepared entries per package (2 MB total). Preview matches case-insensitive SKU and verifies the saved title. Apply uses preview versions to reject stale changes, updates existing direct drafts, and creates missing drafts. Published, archived and production-linked editions are excluded. Existing author credits and stock are retained.
+
+Each row contains the standard book fields plus `printingCost` (rupees), `costBasis` and optional `coverData` (PNG/JPEG/WebP data URI, at most 500 KB). Printing costs and derived markup are private administrative fields; the public catalogue projects only retail prices. Covers use the existing dedicated R2 catalogue image path. Packages never publish listings. A conflict during application reports exactly which SKUs were saved so remaining rows can be previewed again; the package is not an all-or-nothing transaction.
