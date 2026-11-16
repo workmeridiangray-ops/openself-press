@@ -99,6 +99,15 @@ packaged=(await all()).find(r=>r.data.sku==='PKG-1');eq(packaged.data.author,'Te
 plan=await pkg({action:'preview',rows:[...packageRows,...packageRows]});eq(plan.valid,1);
 for(const bad of [{title:'Wrong title'},{coverData:'data:image/png;base64,PHN2Zz4='},{price:'1'}]){plan=await pkg({action:'preview',rows:[{...packageRows[0],...bad}]});eq(plan.valid,0);}
 plan=await pkg({action:'preview',rows:[book({sku:'LINKED',printingCost:'50'})]});eq(plan.valid,0);
+const beforeArtwork={...packaged.data};
+const artwork=[{sku:'PKG-1',title:'Package One',coverOnly:true,coverData:packageRows[0].coverData,price:'1',stock:'999',isbn:'9780306406157',printingCost:'999',author:'Wrong credit'}];
+plan=await pkg({action:'preview',rows:artwork});eq(plan.valid,1);
+await pkg({action:'apply',rows:artwork,versions:{'PKG-1':plan.rows[0].version}});
+packaged=(await all()).find(r=>r.data.sku==='PKG-1');
+for(const key of ['pricePaise','printingCostPaise','markupPaise','stock','isbn','title','author'])eq(packaged.data[key],beforeArtwork[key]);
+eq(packaged.data.coverKey!==beforeArtwork.coverKey,true);
+plan=await pkg({action:'preview',rows:[{...artwork[0],sku:'MISSING'}]});eq(plan.valid,0);
+plan=await pkg({action:'preview',rows:[{...artwork[0],coverData:''}]});eq(plan.valid,0);
 await post(save({...packaged.data,price:'220'},'Published',{id:packaged.id,version:packaged.version}));
 plan=await pkg({action:'preview',rows:packageRows});eq(plan.valid,0);
 const projected=(await storefront()).find(r=>r.id===packaged.id);eq(projected.printingCostPaise,undefined);eq(projected.markupPaise,undefined);
