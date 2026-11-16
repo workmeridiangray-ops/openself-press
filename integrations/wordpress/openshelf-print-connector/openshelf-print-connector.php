@@ -2,7 +2,7 @@
 /**
  * Plugin Name: OpenShelf Print Connector
  * Description: Signed, idempotent OpenShelf production orders held for printer approval.
- * Version: 0.1.0
+ * Version: 0.3.0
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  */
@@ -15,6 +15,7 @@ final class OSP_Print_Connector {
         add_action('add_meta_boxes', [__CLASS__, 'boxes']);
         add_action('admin_post_osp_stage', [__CLASS__, 'save_stage']);
         add_action('admin_post_osp_file', [__CLASS__, 'download']);
+        add_action('admin_post_osp_charges', [__CLASS__, 'save_charges']);
         // OpenShelf owns buyer notifications; these fulfilment records must not send a second bill.
         foreach (['new_order','cancelled_order','failed_order','customer_on_hold_order','customer_processing_order','customer_completed_order','customer_invoice','customer_note','customer_refunded_order'] as $email) {
             add_filter('woocommerce_email_enabled_' . $email, function($enabled, $order) {
@@ -58,6 +59,9 @@ final class OSP_Print_Connector {
             ? true : new WP_Error('osp_auth', 'Invalid signature', ['status' => 403]);
     }
     public static function routes() {
+        register_rest_route('openshelf/v1', '/capabilities', ['methods'=>'GET','permission_callback'=>[__CLASS__,'authorised'],'callback'=>function(){return ['version'=>3,'supplierSettlements'=>true,'dailyCreditTerms'=>defined('OSP_ALLOW_DAILY_SETTLEMENT')&&OSP_ALLOW_DAILY_SETTLEMENT===true];}]);
+        register_rest_route('openshelf/v1', '/settlements', ['methods'=>'POST','permission_callback'=>[__CLASS__,'authorised'],'callback'=>[__CLASS__,'settlement']]);
+        register_rest_route('openshelf/v1', '/orders/(?P<id>\d+)/cancel', ['methods'=>'POST','permission_callback'=>[__CLASS__,'authorised'],'callback'=>[__CLASS__,'cancel']]);
         register_rest_route('openshelf/v1', '/orders', ['methods' => 'POST', 'permission_callback' => [__CLASS__, 'authorised'], 'callback' => [__CLASS__, 'receive']]);
         register_rest_route('openshelf/v1', '/orders/(?P<id>\d+)', ['methods' => 'GET', 'permission_callback' => [__CLASS__, 'authorised'], 'callback' => [__CLASS__, 'status']]);
     }
@@ -146,7 +150,7 @@ final class OSP_Print_Connector {
     public static function status($request) {
         $order=wc_get_order((int)$request['id']);
         if (!$order || $order->get_created_via() !== 'openshelf') return new WP_Error('osp_missing','Order not found',['status'=>404]);
-        return ['id'=>$order->get_id(),'sourceOrder'=>$order->get_meta('_osp_source_order'),'stage'=>$order->get_meta('_osp_stage'),'revision'=>(int)$order->get_meta('_osp_revision'),'carrier'=>$order->get_meta('_osp_carrier'),'tracking'=>$order->get_meta('_osp_tracking'),'trackingURL'=>$order->get_meta('_osp_tracking_url')];
+        return ['id'=>$order->get_id(),'sourceOrder'=>$order->get_meta('_osp_source_order'),'stage'=>$order->get_meta('_osp_stage'),'revision'=>(int)$order->get_meta('_osp_revision'),'carrier'=>$order->get_meta('_osp_carrier'),'tracking'=>$order->get_meta('_osp_tracking'),'trackingURL'=>$order->get_meta('_osp_tracking_url'),'charge'=>$order->get_meta('_osp_charges')?:null,'settlement'=>$order->get_meta('_osp_settlement')?:null];
     }
     public static function boxes() {
         foreach (['shop_order','woocommerce_page_wc-orders'] as $screen) add_meta_box('osp-production','OpenShelf production',[__CLASS__,'box'],$screen,'normal','high');
@@ -154,6 +158,7 @@ final class OSP_Print_Connector {
     public static function box($object) {
         $order=$object instanceof WC_Order ? $object : wc_get_order($object->ID);
         if (!$order || $order->get_created_via() !== 'openshelf') { echo '<p>Not an OpenShelf fulfilment order.</p>'; return; }
+        self::charge_box($order);
         $stage=$order->get_meta('_osp_stage'); $next=array_search($stage,self::STAGES,true)+1;
         echo '<p><strong>'.esc_html($order->get_meta('_osp_source_order')).'</strong> · '.esc_html($stage).'</p><p>Customer payment stays in OpenShelf. These totals are estimated production charges, excluding shipping and tax. Approve the charge/settlement and exact PDFs before printing.</p>';
         if ($next >= count(self::STAGES)) return;
@@ -178,6 +183,8 @@ final class OSP_Print_Connector {
             if ((int)($_POST['osp_revision']??0)!==$revision || $index===false || (self::STAGES[$index+1]??'')!==$target || empty($_POST['osp_confirmed'])) wp_die('Refresh the order and confirm the next stage');
             $carrier=sanitize_text_field(wp_unslash($_POST['osp_carrier']??'')); $tracking=sanitize_text_field(wp_unslash($_POST['osp_tracking']??''));
             if (in_array($target,['Dispatched','Delivered'],true)&&(!$carrier||!$tracking)) wp_die('Carrier and tracking are required');
+            if ($target==='In production' && !$order->get_meta('_osp_charges')) wp_die('Confirm the supplier invoice and final charges before print release');
+            if ($target==='In production' && ($order->get_meta('_osp_settlement')['state']??'')!=='settled' && (!defined('OSP_ALLOW_DAILY_SETTLEMENT') || OSP_ALLOW_DAILY_SETTLEMENT!==true)) wp_die('Wait for confirmed supplier payment, or configure agreed daily settlement terms');
             $order->update_meta_data('_osp_stage',$target); $order->update_meta_data('_osp_revision',$revision+1); $order->update_meta_data('_osp_carrier',$carrier); $order->update_meta_data('_osp_tracking',$tracking);
             $url=esc_url_raw(wp_unslash($_POST['osp_tracking_url']??''),['https']); $order->update_meta_data('_osp_tracking_url',$url);
             if ($target==='In production') $order->set_status('processing');
@@ -186,6 +193,84 @@ final class OSP_Print_Connector {
             // No payment_complete: production settlement remains a separate accounting decision.
         } finally { $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock)); }
         wp_safe_redirect($order->get_edit_order_url()); exit;
+    }
+
+    private static function charge_box($order) {
+        $c=$order->get_meta('_osp_charges')?:[]; $settlement=$order->get_meta('_osp_settlement')?:[];
+        echo '<h3>Supplier invoice and daily settlement</h3><p>Customer payment is received by OpenShelf. Confirm your final production charges, shipping, tax and discount before release. This does not collect a second customer payment.</p>';
+        if ($settlement) echo '<p><strong>'.esc_html($settlement['state']??'').'</strong> · '.esc_html($settlement['batchId']??'').' · UTR '.esc_html($settlement['utr']??'').'</p>';
+        wp_nonce_field('osp_charges_'.$order->get_id(),'osp_charges_nonce');
+        echo '<input type="hidden" name="osp_charge_order" value="'.esc_attr($order->get_id()).'"><input type="hidden" name="osp_charge_revision" value="'.esc_attr($c['revision']??0).'">';
+        echo '<p><label>Supplier invoice/reference <input name="osp_invoice" value="'.esc_attr($c['invoice']??'').'"></label></p>';
+        foreach (['productionPaise'=>'Production','shippingPaise'=>'Shipping','taxPaise'=>'Tax','discountPaise'=>'Discount'] as $key=>$label) echo '<p><label>'.esc_html($label).' INR <input type="number" min="0" step="0.01" name="osp_'.$key.'" value="'.esc_attr(isset($c[$key])?number_format($c[$key]/100,2,'.',''):'').'"></label></p>';
+        echo '<p><label><input type="checkbox" name="osp_charges_confirmed" value="1"> I checked these final invoice charges and shipping/tax treatment.</label></p><button type="submit" class="button" formaction="'.esc_url(add_query_arg('action','osp_charges',admin_url('admin-post.php'))).'" formmethod="post">Confirm final supplier charges</button>';
+    }
+    public static function final_charge($input,$revision) {
+        $invoice=sanitize_text_field(wp_unslash($input['osp_invoice']??''));if(!$invoice||strlen($invoice)>100)throw new Exception('Enter the supplier invoice/reference');
+        $c=['revision'=>$revision,'invoice'=>$invoice,'confirmedAt'=>gmdate('Y-m-d\TH:i:s\Z')];
+        foreach (['productionPaise','shippingPaise','taxPaise','discountPaise'] as $key) {
+            $value=trim(wp_unslash($input['osp_'.$key]??''));
+            if(!preg_match('/^\d{1,7}(?:\.\d{1,2})?$/D',$value))throw new Exception('Enter each final charge in INR, including explicit zero amounts');
+            $c[$key]=(int)round((float)$value*100);
+        }
+        $total=$c['productionPaise']+$c['shippingPaise']+$c['taxPaise']-$c['discountPaise'];if($total<100||$total>100000000)throw new Exception('Invalid supplier total');
+        return $c;
+    }
+    public static function save_charges() {
+        if (!current_user_can('manage_woocommerce')) wp_die('Not authorised',403);
+        $id=absint($_POST['osp_charge_order']??0);check_admin_referer('osp_charges_'.$id,'osp_charges_nonce');
+        global $wpdb;$lock='osp_stage_'.$id;
+        if ((int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,5)',$lock))!==1) wp_die('Order is busy; refresh');
+        try {
+            $order=wc_get_order($id);if(!$order||$order->get_created_via()!=='openshelf'||$order->get_meta('_osp_stage')==='Cancelled')wp_die('Choose an active OpenShelf order');
+            $old=$order->get_meta('_osp_charges')?:[];
+            if ((int)($_POST['osp_charge_revision']??0)!==(int)($old['revision']??0)||empty($_POST['osp_charges_confirmed']))wp_die('Refresh and confirm the exact invoice revision');
+            $c=self::final_charge($_POST,(int)($old['revision']??0)+1);$invoice=$c['invoice'];$total=$c['productionPaise']+$c['shippingPaise']+$c['taxPaise']-$c['discountPaise'];
+            $order->update_meta_data('_osp_charges',$c);$order->update_meta_data('_osp_revision',(int)$order->get_meta('_osp_revision')+1);$order->save();$order->add_order_note('Final supplier invoice '.$invoice.' confirmed; INR '.number_format($total/100,2,'.','').'. OpenShelf must approve this exact revision for settlement.');
+        } catch(Throwable $e){wp_die(esc_html($e->getMessage()));} finally {$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
+        wp_safe_redirect($order->get_edit_order_url());exit;
+    }
+    public static function cancel($request) {
+        global $wpdb;$id=(int)$request['id'];$lock='osp_stage_'.$id;
+        if((int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,5)',$lock))!==1)return new WP_Error('osp_busy','Order busy',['status'=>409]);
+        try {
+            $order=wc_get_order($id);$body=$request->get_json_params();
+            if(!$order||$order->get_created_via()!=='openshelf'||$order->get_meta('_osp_source_order')!==($body['sourceOrder']??''))throw new Exception('Order mismatch');
+            if($order->get_meta('_osp_stage')==='Cancelled')return ['cancelled'=>true,'sourceOrder'=>$body['sourceOrder']];
+            if($order->get_meta('_osp_stage')!=='Awaiting approval'||$order->get_status()!=='on-hold')throw new Exception('Physical work may have started; arrange cancellation and cost responsibility directly');
+            $order->update_meta_data('_osp_stage','Cancelled');$order->update_meta_data('_osp_revision',(int)$order->get_meta('_osp_revision')+1);$order->set_status('cancelled');$order->save();$order->add_order_note('Cancelled at OpenShelf request before print release; customer refund remains separate.');
+            return ['cancelled'=>true,'sourceOrder'=>$body['sourceOrder']];
+        }catch(Throwable $e){return new WP_Error('osp_cancel',$e->getMessage(),['status'=>409]);}
+        finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
+    }
+    public static function settlement($request) {
+        global $wpdb;$p=$request->get_json_params();$id=$p['batchId']??'';
+        if(!preg_match('/^ps-(test|live)-\d{4}-\d{2}-\d{2}$/D',$id)||!in_array($p['state']??'',['settled','reversed'],true)||!preg_match('/^pout_[A-Za-z0-9]+$/D',$p['providerId']??'')||!is_string($p['manifestJSON']??null)||strlen($p['manifestJSON'])>200000)return new WP_Error('osp_manifest','Invalid remittance',['status'=>400]);
+        if(!preg_match('/^[a-f0-9]{64}$/D',$p['manifestHash']??'')||!hash_equals(hash('sha256',$p['manifestJSON']),$p['chunkHash']??''))return new WP_Error('osp_manifest','Manifest digest mismatch',['status'=>400]);
+        $m=json_decode($p['manifestJSON'],true);if(!is_array($m)||($m['day']??'')!==substr($id,8)||($m['environment']??'')!==substr($id,3,4)||($m['currency']??'')!=='INR'||($m['totalPaise']??0)!==($p['amountPaise']??-1)||empty($m['items'])||count($m['items'])>20||!is_int($p['cursor']??null)||$p['cursor']<0||!is_int($p['totalItems']??null)||$p['totalItems']<$p['cursor']+count($m['items']))return new WP_Error('osp_manifest','Invalid manifest',['status'=>400]);
+        $lock='osp_'.$id;if((int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,5)',$lock))!==1)return new WP_Error('osp_busy','Remittance busy',['status'=>409]);
+        try {
+            $key='osp_remittance_'.$id;$prior=get_option($key);
+            if($prior&&($prior['manifestHash']!==$p['manifestHash']||($prior['providerId']!==$p['providerId']&&$prior['state']!=='reversed')))throw new Exception('Conflicting remittance; reconcile before replacing it');
+            if($prior&&$prior['providerId']===$p['providerId']&&$prior['state']==='reversed'&&$p['state']==='settled')throw new Exception('A reversed transfer cannot be restored by a stale receipt');
+            $sum=0;$orders=[];
+            foreach($m['items'] as $item){$order=wc_get_order($item['remoteId']??0);$c=$order?$order->get_meta('_osp_charges'):null;
+                if(!$order||$order->get_created_via()!=='openshelf'||$order->get_meta('_osp_source_order')!==($item['orderId']??'')||!is_array($c)||$c['invoice']!==($item['invoice']??'')||$c['revision']!==($item['revision']??0))throw new Exception('Supplier invoice/order revision mismatch');
+                $total=$c['productionPaise']+$c['shippingPaise']+$c['taxPaise']-$c['discountPaise'];if($total!==($item['amountPaise']??-1))throw new Exception('Supplier invoice amount mismatch');
+                $existing=$order->get_meta('_osp_settlement');if($existing&&$existing['batchId']!==$id)throw new Exception('Order already allocated to a different remittance');
+                $sum+=$total;$orders[]=$order;
+            }
+            foreach($m['credits']??[] as $credit){if(!is_int($credit['amountPaise']??null)||$credit['amountPaise']<1)throw new Exception('Invalid agreed credit note');$sum-=$credit['amountPaise'];}
+            if(!is_int($p['amountPaise'])||$p['amountPaise']<100||($m['grossPaise']??0)<$sum)throw new Exception('Remittance total mismatch');
+            $chunkKey=$p['providerId'].'|'.$p['state'].'|'.$p['cursor'];
+            if($prior&&isset($prior['chunks'][$chunkKey])&&$prior['chunks'][$chunkKey]!==$p['chunkHash'])throw new Exception('Conflicting receipt chunk');
+            $receipt=['batchId'=>$id,'manifestHash'=>$p['manifestHash'],'providerId'=>$p['providerId'],'state'=>$p['state'],'utr'=>substr((string)($p['utr']??''),0,100),'amountPaise'=>$p['amountPaise']];
+            // Safe to repeat after a partial save: the same manifest and provider reference are retained.
+            $registry=$receipt;$registry['chunks']=$prior['chunks']??[];$registry['chunks'][$chunkKey]=$p['chunkHash'];update_option($key,$registry,false);
+            foreach($orders as $order){$old=$order->get_meta('_osp_settlement');$order->update_meta_data('_osp_settlement',$receipt);$order->save();if($old!==$receipt)$order->add_order_note('OpenShelf supplier remittance '.$id.': '.$p['state'].'; provider '.$p['providerId'].'; UTR '.$receipt['utr'].'. This is supplier settlement, not a second customer payment.');}
+            return ['batchId'=>$id,'accepted'=>true,'cursor'=>$p['cursor']];
+        }catch(Throwable $e){return new WP_Error('osp_manifest',$e->getMessage(),['status'=>409]);}
+        finally{$wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock));}
     }
     public static function download() {
         if (!current_user_can('manage_woocommerce')) wp_die('Not authorised',403);

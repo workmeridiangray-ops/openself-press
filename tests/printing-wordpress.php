@@ -11,12 +11,13 @@ function add_query_arg($query,$url){return $url.'?'.http_build_query($query);}
 function update_post_meta(...$a){} function wp_unslash($s){return $s;}
 function wc_get_product($id){return new class {function get_status(){return 'publish';}};}
 function WC(){return (object)['countries'=>new class{function get_states($c){return ['WB'=>'West Bengal','GJ'=>'Gujarat'];}}];}
+$options=[];function get_option($key){global $options;return $options[$key]??false;}function update_option($key,$value,...$rest){global $options;$options[$key]=$value;}function sanitize_text_field($value){return trim(strip_tags($value));}
 $orders=[];$nextId=100;$crash=false;
 class WC_Order {
  public $id=0,$via='',$meta=[],$items=[],$status='',$address=[],$total=0;
  function __construct(){}
  function set_created_via($v){$this->via=$v;} function get_created_via(){return $this->via;}
- function set_currency($v){} function set_status($v){$this->status=$v;}
+ function get_status(){return $this->status;} function set_currency($v){} function set_status($v){$this->status=$v;}
  function set_payment_method($v){} function set_payment_method_title($v){}
  function update_meta_data($k,$v){$this->meta[$k]=$v;} function get_meta($k){return $this->meta[$k]??'';}
  function set_address($v,$k){$this->address[$k]=$v;} function get_id(){return $this->id;}
@@ -75,4 +76,26 @@ eq(OSP_Print_Connector::receive($broken)->code,'osp_review');eq(count($orders),2
 eq(OSP_Print_Connector::receive($broken)->code,'osp_review');eq(count($orders),2);
 $status=OSP_Print_Connector::status(new Request('',[],101));eq($status['stage'],'Awaiting approval');eq($status['revision'],1);eq($status['sourceOrder'],'synthetic-order');
 eq(($hooks['woocommerce_email_enabled_customer_on_hold_order'])(true,$orders[101]),false);eq(($hooks['woocommerce_order_needs_payment'])(true,$orders[101]),false);
+$values=['osp_invoice'=>'SUP-101','osp_productionPaise'=>'126.00','osp_shippingPaise'=>'50','osp_taxPaise'=>'0','osp_discountPaise'=>'0'];
+$charge=OSP_Print_Connector::final_charge($values,1);eq($charge['productionPaise'],12600);eq($charge['shippingPaise'],5000);
+$invalid=$values;$invalid['osp_discountPaise']='9999';fails(fn()=>OSP_Print_Connector::final_charge($invalid,1));
+$invalid=$values;$invalid['osp_productionPaise']='1.001';fails(fn()=>OSP_Print_Connector::final_charge($invalid,1));
+$invalid=$values;unset($invalid['osp_taxPaise']);fails(fn()=>OSP_Print_Connector::final_charge($invalid,1));
+$orders[101]->update_meta_data('_osp_charges',$charge);
+$manifest=['day'=>'2026-11-16','environment'=>'test','currency'=>'INR','grossPaise'=>17600,'totalPaise'=>17600,'credits'=>[],'items'=>[['orderId'=>'synthetic-order','remoteId'=>101,'invoice'=>'SUP-101','revision'=>1,'amountPaise'=>17600]]];
+$rawManifest=json_encode($manifest,JSON_UNESCAPED_SLASHES);
+$receipt=['batchId'=>'ps-test-2026-11-16','state'=>'settled','providerId'=>'pout_synthetic','manifestJSON'=>$rawManifest,'manifestHash'=>hash('sha256',$rawManifest),'chunkHash'=>hash('sha256',$rawManifest),'amountPaise'=>17600,'cursor'=>0,'totalItems'=>1,'utr'=>'SYNTHETIC-UTR'];
+eq(OSP_Print_Connector::settlement(new Request(json_encode($receipt)))['accepted'],true);
+eq($orders[101]->get_meta('_osp_settlement')['state'],'settled');eq($orders[101]->status,'on-hold');
+eq(OSP_Print_Connector::settlement(new Request(json_encode($receipt)))['accepted'],true);
+$bad=$receipt;$bad['chunkHash']=str_repeat('0',64);eq(OSP_Print_Connector::settlement(new Request(json_encode($bad)))->code,'osp_manifest');
+$bad=$receipt;$bad['providerId']='pout_other';eq(OSP_Print_Connector::settlement(new Request(json_encode($bad)))->code,'osp_manifest');
+$bad=$receipt;$wrong=$manifest;$wrong['items'][0]['amountPaise']=1;$bad['manifestJSON']=json_encode($wrong);$bad['chunkHash']=hash('sha256',$bad['manifestJSON']);eq(OSP_Print_Connector::settlement(new Request(json_encode($bad)))->code,'osp_manifest');
+$receipt['state']='reversed';eq(OSP_Print_Connector::settlement(new Request(json_encode($receipt)))['accepted'],true);eq($orders[101]->get_meta('_osp_settlement')['state'],'reversed');
+$receipt['state']='settled';eq(OSP_Print_Connector::settlement(new Request(json_encode($receipt)))->code,'osp_manifest');
+// A replacement payout is accepted only after the prior transfer reversed.
+$receipt['providerId']='pout_replacement';eq(OSP_Print_Connector::settlement(new Request(json_encode($receipt)))['accepted'],true);eq($orders[101]->status,'on-hold');
+$orders[101]->update_meta_data('_osp_stage','In production');
+eq(OSP_Print_Connector::cancel(new Request(json_encode(['sourceOrder'=>'synthetic-order']),[],101))->code,'osp_cancel');
+$orders[101]->update_meta_data('_osp_stage','Awaiting approval');eq(OSP_Print_Connector::cancel(new Request(json_encode(['sourceOrder'=>'synthetic-order']),[],101))['cancelled'],true);eq($orders[101]->status,'cancelled');eq(OSP_Print_Connector::cancel(new Request(json_encode(['sourceOrder'=>'synthetic-order']),[],101))['cancelled'],true);
 echo "$n WordPress receiver checks passed (WordPress/WooCommerce adapters; no live calls)\n";

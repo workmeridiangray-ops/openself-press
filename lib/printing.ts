@@ -43,7 +43,7 @@ export async function markPrintPaid(order:any,data:any) {
 }
 export async function printRequest(method:string,path:string,body='') {
   const secret=secrets().PRINTING_SECRET;
-  if(!printingEnabled()||!secret||secret.length<32)throw Error('Printing connector is not activated');
+  if((!printingEnabled()&&!['/capabilities','/settlements'].includes(path))||!secret||secret.length<32)throw Error('Printing connector is not activated');
   // Fixed destinations prevent a misconfigured URL leaking the shared credential or files.
   const fullPath='/wp-json/openshelf/v1'+path;
   const response=await fetch('https://onlineprintingz.in'+fullPath,{method,redirect:'error',signal:AbortSignal.timeout(15000),headers:{...await signedHeaders(secret,method,fullPath,body),'Content-Type':'application/json'},...(method==='POST'?{body}:{})});
@@ -55,6 +55,7 @@ export async function transferPrintJob(id:string) {
   if(!printingEnabled())return {disabled:true};
   const order=await record(id);
   if(order.kind!=='Orders'||order.status!=='Paid')throw Error('Only verified paid orders may be transferred');
+  if(secrets().SETTLEMENT_SCHEMA==='1'&&order.data.paymentEnvironment!=='live')throw Error('Verify a live customer payment before releasing a real printing order');
   const token=crypto.randomUUID(),time=Date.now();
   const lock=await db().prepare("UPDATE printing_jobs SET lease_until=?,lease_token=?,state='Sending',attempts=attempts+1,updated=? WHERE order_id=? AND state IN ('Queued','Retry','Sending') AND lease_until<? AND next_attempt<=?").bind(time+60000,token,now(),id,time,time).run();
   if(!lock.meta.changes)return {busyOrTransferred:true};
@@ -88,6 +89,7 @@ export async function syncPrintJob(id:string) {
   if(!job?.remote_id)throw Error('Transfer the print order first');
   const incoming=await printRequest('GET','/orders/'+job.remote_id);
   if(incoming.sourceOrder!==id||incoming.id!==job.remote_id||!Number.isSafeInteger(incoming.revision)||incoming.revision<1)throw Error('Printer update does not match this order');
+  if(secrets().SETTLEMENT_SCHEMA==='1'&&incoming.charge){const {ingestSupplierCharge,flagFinanceAlert}=await import('./settlements');try{await ingestSupplierCharge(await record(id),incoming)}catch(e){await flagFinanceAlert(id,String((e as Error).message));}}
   if(incoming.revision<=job.remote_revision){await db().prepare('UPDATE printing_jobs SET last_error=\'\',updated=? WHERE order_id=?').bind(now(),id).run();return {unchanged:true};}
   const r=await record(id),stage=nextPrintStage(r.data.printingStage||'Awaiting approval',incoming.stage,incoming);
   if(!['Paid','In production','Ready to ship','Dispatched','Delivered'].includes(r.status))throw Error('Order requires manual reconciliation');
