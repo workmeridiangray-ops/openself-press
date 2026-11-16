@@ -126,7 +126,7 @@ plan=await pkg({action:'preview',rows:[{...stockRows[0],title:'Wrong title'}]});
 console.log(`${checks} total catalogue, cover and inventory package checks passed`);
 
 // Author-only updates change exactly the author credit of direct draft listings.
-await post(save(book({sku:'CREDIT-1',title:'Credit Test'})));
+await post(save(book({sku:'CREDIT-1',title:'Credit Test',tag:'Draft: review pending'})));
 const creditBook=(await all()).find(r=>r.data.sku==='CREDIT-1');
 const beforeCredit={...creditBook.data};
 const credits=[{sku:'CREDIT-1',title:creditBook.data.title,authorOnly:true,author:'Koko Nest',stock:999,price:'1',isbn:'9780306406157'}];
@@ -137,3 +137,20 @@ for(const key of Object.keys(beforeCredit).filter(k=>k!=='author'))eq(credited.d
 for(const author of ['', 'x'.repeat(201)]){plan=await pkg({action:'preview',rows:[{...credits[0],author}]});eq(plan.valid,0);}
 plan=await pkg({action:'preview',rows:[{...credits[0],sku:'MISSING'}]});eq(plan.valid,0);
 console.log(`${checks} total catalogue package checks passed`);
+// Publication uses saved values, keeps blank ISBNs and requires explicit rights confirmation.
+const readyBefore={...credited.data};
+const publications=[{sku:'CREDIT-1',title:'Credit Test',publishOnly:true,stock:999,author:'Wrong credit',price:'1'}];
+plan=await pkg({action:'preview',rows:publications});eq(plan.valid,1);eq(plan.publishing,true);eq((await all()).find(r=>r.id===credited.id).status,'Draft');
+await pkg({action:'apply',rows:publications,versions:{'CREDIT-1':plan.rows[0].version}},400);
+await pkg({action:'apply',rows:publications,versions:{'CREDIT-1':plan.rows[0].version},rightsConfirmed:true});
+let publishedCredit=(await all()).find(r=>r.id===credited.id);eq(publishedCredit.status,'Published');eq(!!publishedCredit.data.rightsConfirmedAt,true);
+eq(publishedCredit.data.tag,'');
+for(const key of Object.keys(readyBefore).filter(k=>k!=='tag'))eq(publishedCredit.data[key],readyBefore[key]);
+plan=await pkg({action:'preview',rows:publications});eq(plan.valid,1);
+await pkg({action:'apply',rows:publications,versions:{'CREDIT-1':plan.rows[0].version},rightsConfirmed:true});
+plan=await pkg({action:'preview',rows:[{sku:'LINKED',title:'The Test Shelf',publishOnly:true}]});eq(plan.valid,0);
+await post(save(book({sku:'NO-COVER',title:'Cover missing',cover:''})));
+plan=await pkg({action:'preview',rows:[{sku:'NO-COVER',title:'Cover missing',publishOnly:true}]});eq(plan.valid,0);
+await post(save(book({sku:'NO-AUTHOR',title:'Credit pending',author:'Author to be confirmed'})));
+plan=await pkg({action:'preview',rows:[{sku:'NO-AUTHOR',title:'Credit pending',publishOnly:true}]});eq(plan.valid,0);
+console.log(`${checks} total catalogue and publication checks passed`);
