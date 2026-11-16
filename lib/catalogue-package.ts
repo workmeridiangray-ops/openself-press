@@ -23,8 +23,14 @@ export function preparePackage(rows:any[],existing:any[]){
     const prior=matches[0];
     if(prior&&(prior.status!=='Draft'||prior.data.bookReference))throw Error('Only direct draft listings can be updated with a package.');
     if(prior&&String(prior.data.title).trim()!==String(input.title).trim())throw Error('The title does not match the saved book code.');
-    const cost=String(input.printingCost??'');if(!/^\d+(\.\d{1,2})?$/.test(cost)||Number(cost)>1_000_000)throw Error('Enter a valid printing cost.');
     const cover=packageCover(input.coverData);
+    if(input.coverOnly===true){
+      if(!prior)throw Error('Cover-only updates require an existing draft book.');
+      if(!cover)throw Error('Attach cover artwork for a cover-only update.');
+      // Preserve the saved record exactly; cover-only packages cannot change pricing or metadata.
+      return {row:index+1,sku,title:prior.data.title,data:{...prior.data},prior,cover,error:''};
+    }
+    const cost=String(input.printingCost??'');if(!/^\d+(\.\d{1,2})?$/.test(cost)||Number(cost)>1_000_000)throw Error('Enter a valid printing cost.');
     const merged=prior?{...prior.data,price:input.price,isbn:input.isbn??prior.data.isbn}:input;
     const data:any=normalizeCatalogueBook(merged,'Draft',!!cover||!!prior?.data.coverKey);
     const printingCostPaise=Math.round(Number(cost)*100);
