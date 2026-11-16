@@ -20,6 +20,8 @@ const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_date: "2026-05-15",
   compatibility_flags: ["nodejs_compat"],
+  // Preserve owner-managed runtime values (admin allowlists, sender and activation flag).
+  keep_vars: true,
   triggers: { crons: ["*/5 * * * *"] },
   d1_databases: d1
     ? [
