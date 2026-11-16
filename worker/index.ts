@@ -24,6 +24,10 @@ function withSecurityHeaders(request: Request, response: Response): Response {
 }
 
 const worker = {
+  async scheduled(_event: ScheduledController, _env: Cloudflare.Env, ctx: ExecutionContext) {
+    const {runPrintQueue} = await import('../lib/printing');
+    ctx.waitUntil(runPrintQueue());
+  },
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and
