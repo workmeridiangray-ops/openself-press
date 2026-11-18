@@ -27,6 +27,7 @@ const worker = {
   async scheduled(_event: ScheduledController, _env: Cloudflare.Env, ctx: ExecutionContext) {
     const {runPrintQueue} = await import('../lib/printing');
     ctx.waitUntil(runPrintQueue());
+    if((_env as Cloudflare.Env & {SETTLEMENT_SCHEMA?:string}).SETTLEMENT_SCHEMA==='1'){const {runSettlementQueue}=await import('../lib/settlements');ctx.waitUntil(runSettlementQueue());}
   },
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
     let binding = ctx.props?.CONNECTORS;

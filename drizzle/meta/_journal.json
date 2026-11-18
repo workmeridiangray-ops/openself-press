@@ -29,6 +29,13 @@
       "when": 1794801774642,
       "tag": "0003_printing_connector",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794844293398,
+      "tag": "0004_printer_settlements",
+      "breakpoints": true
     }
   ]
 }

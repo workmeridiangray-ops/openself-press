@@ -1,5 +1,7 @@
 # OpenShelf → OnlinePrintingz connector
 
+For connector 0.3.0 and daily supplier payments, complete [the settlement launch guide](SETTLEMENT_LAUNCH.md) as well. Print release now requires a confirmed supplier invoice and either confirmed remittance or explicitly agreed daily credit terms.
+
 This branch prepares the connection. It does not activate either production website.
 
 ## Implemented behaviour

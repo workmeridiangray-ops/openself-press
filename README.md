@@ -117,3 +117,7 @@ Validation: `node tests/author-tools.mjs` covers the author API and rendered man
 ### OnlinePrintingz fulfilment connector (disabled until activation)
 
 The branch adds immutable order-file snapshots, verified-payment outbox jobs, signed printer transfers, retries/review controls, private approved-PDF delivery and production/tracking sync. The companion WordPress plugin targets the existing perfect-binding product 12982 and holds every imported order for printer approval. Retail payment and production settlement remain separate. Follow [the setup and acceptance guide](docs/ONLINEPRINTINGZ_SETUP.md) before activation; deployment credentials, migration, final book specifications and live acceptance remain required.
+
+## Daily supplier settlements
+
+Supplier invoice approval, frozen daily manifests, a fixed-egress provider relay, canonical payout/refund reconciliation and printer remittance receipts are included with disabled defaults. Read the [operating specification](docs/ORDER_TO_SETTLEMENT_PLAN.md) and [launch guide](docs/SETTLEMENT_LAUNCH.md). Production requires verified provider/host configuration and owner activation; repository checks make no bank transfers.
