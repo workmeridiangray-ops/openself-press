@@ -61,6 +61,23 @@ Private R2 object keys never leave OpenShelf. The printer's Content File / Cover
 
 ## Verification
 
+### Isolated full test without an allocated ISBN
+
+Deploy the updated source and replace the WordPress connector with **0.2.0** from `integrations/wordpress/openshelf-print-connector.zip`. Keep the existing shared secret and WordPress `OSP_CONNECTOR_ENABLED=true`. OpenShelf `PRINTING_ENABLED` can remain **0**.
+
+In the staff Orders / Production / Shipping page, an **admin** can use **Run full test order**. The test:
+
+1. Generates a synthetic 42-page interior and one-page test cover, both watermarked with test-only text, and uses checksum-valid placeholder **9780000000002**. This is not an ISBN allocation. No real book, allocation evidence, author proof, payment, invoice, stock, royalty, or customer order is created or changed.
+2. Probes a signed test-capability endpoint. The old plugin cannot receive a test accidentally: no import is attempted unless the upgraded receiver confirms held-only test support.
+3. Sends one `TEST ONLY` fulfilment order with synthetic delivery details to WooCommerce. It remains on hold. The synthetic fixture uses the selected A4 rate, 42 B&W pages, 80 GSM cream, matte and 30 g; it is not a measured shipping specification for Dynamic GK.
+4. Replays the exact same source reference and checks that the same WooCommerce order is returned. WordPress fetches both private PDFs using the normal signed file proxy and verifies their SHA-256 digests.
+5. Simulates In production, Ready to ship, Dispatched and Delivered, reading each status back into the private test report. WooCommerce remains on hold throughout; test controls cannot operate on real orders, and the normal production-release controls reject test orders. A save guard prevents test orders from moving to paid/processing/completed statuses, and stock reduction is disabled for test orders.
+6. Cancels the WooCommerce test order and disables access to its synthetic files. The private **Printing tests** report retains the reference and check results. No real payment or courier API is called. Review installed third-party shipping automations before using any production store for acceptance testing.
+
+If interrupted, use **Show latest test → Resume this test** to reuse its original reference, or **Cancel test order** for cleanup. Do not create another test to recover an interrupted import. A receiver crash that leaves an import registry entry in `creating` still needs the reconciliation described above.
+
+The test does not activate production printing, prove a real payment integration, allocate an ISBN, approve Dynamic GK, or validate a physical cover spine/parcel weight. Those still require the real production acceptance steps above. No new D1 migration is needed; test records use the existing private records table and their own R2 prefix.
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm exec tsc --noEmit

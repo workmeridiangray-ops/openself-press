@@ -2,7 +2,7 @@
 /**
  * Plugin Name: OpenShelf Print Connector
  * Description: Signed, idempotent OpenShelf production orders held for printer approval.
- * Version: 0.1.0
+ * Version: 0.2.0
  * Requires PHP: 8.0
  * Requires Plugins: woocommerce
  */
@@ -23,6 +23,10 @@ final class OSP_Print_Connector {
         }
         add_filter('woocommerce_order_needs_payment', function($needed, $order) {
             return $order->get_created_via() === 'openshelf' ? false : $needed;
+        }, 10, 2);
+        add_action('woocommerce_before_order_object_save', [__CLASS__, 'hold_test']);
+        add_filter('woocommerce_can_reduce_order_stock', function($allowed, $order) {
+            return $order->get_meta('_osp_test_mode') === 'yes' ? false : $allowed;
         }, 10, 2);
         add_action('before_woocommerce_init', function() {
             if (class_exists('Automattic\\WooCommerce\\Utilities\\FeaturesUtil')) {
@@ -58,6 +62,8 @@ final class OSP_Print_Connector {
             ? true : new WP_Error('osp_auth', 'Invalid signature', ['status' => 403]);
     }
     public static function routes() {
+        register_rest_route('openshelf/v1', '/test-capabilities', ['methods'=>'GET', 'permission_callback'=>[__CLASS__,'authorised'], 'callback'=>function(){return ['version'=>1,'heldOnly'=>true];}]);
+        foreach (['check','stage','cancel'] as $operation) register_rest_route('openshelf/v1', '/test-orders/(?P<id>\d+)/'.$operation, ['methods'=>'POST','permission_callback'=>[__CLASS__,'authorised'],'callback'=>[__CLASS__,'test_'.$operation]]);
         register_rest_route('openshelf/v1', '/orders', ['methods' => 'POST', 'permission_callback' => [__CLASS__, 'authorised'], 'callback' => [__CLASS__, 'receive']]);
         register_rest_route('openshelf/v1', '/orders/(?P<id>\d+)', ['methods' => 'GET', 'permission_callback' => [__CLASS__, 'authorised'], 'callback' => [__CLASS__, 'status']]);
     }
@@ -65,10 +71,16 @@ final class OSP_Print_Connector {
     public static function validate($p) {
         if (!is_array($p) || ($p['schema'] ?? null) !== 1 || ($p['mode'] ?? '') !== 'hold' || ($p['currency'] ?? '') !== 'INR' || !preg_match('/^[a-zA-Z0-9_-]{1,100}$/D', $p['sourceOrder'] ?? '')) throw new Exception('Invalid order envelope');
         if (!is_array($p['items'] ?? null) || count($p['items']) < 1 || count($p['items']) > 50) throw new Exception('Invalid order items');
+        $test = ($p['testMode'] ?? false) === true;
+        if (array_key_exists('testMode',$p) && !$test || str_starts_with($p['sourceOrder'],'osp-test-') !== $test) throw new Exception('Invalid test envelope');
+        if ($test && !preg_match('/^osp-test-[a-f0-9-]{36}$/D',$p['sourceOrder'])) throw new Exception('Invalid test reference');
         $d = $p['delivery'] ?? [];
         foreach (['name','address','city','state','pin','phone'] as $k) if (!is_string($d[$k] ?? null) || trim($d[$k]) === '' || strlen($d[$k]) > 1000) throw new Exception('Incomplete delivery address');
         if (($d['country'] ?? '') !== 'IN' || !preg_match('/^[1-9]\d{5}$/D', $d['pin']) || !preg_match('/^[0-9 +()-]{10,16}$/D', $d['phone'])) throw new Exception('Invalid delivery PIN or phone');
+        if ($test && ($d !== ['name'=>'TEST ONLY','address'=>'TEST ONLY - DO NOT SHIP','city'=>'Kolkata','state'=>'WB','pin'=>'700001','phone'=>'0000000000','country'=>'IN'] || count($p['items'])!==1)) throw new Exception('Use the synthetic test delivery fixture');
         foreach ($p['items'] as $index => $i) {
+            if ($test && (($i['isbn']??'')!=='9780000000002' || !str_starts_with($i['title']??'','TEST ONLY - ') || ($i['copies']??0)!==1)) throw new Exception('Use the test ISBN, title and quantity');
+            if ($test) foreach (['interior','cover'] as $kind) if (!preg_match('/^[a-f0-9]{64}$/D',$i['files'][$kind]['sha256']??'')) throw new Exception('Missing test PDF digest');
             if (($i['productId'] ?? 0) !== 12982 || ($i['index'] ?? -1) !== $index || !self::integer($i['copies'] ?? null, 1, 10000) || !is_string($i['title'] ?? null) || strlen($i['title']) > 300 || !preg_match('/^97[89]\d{10}$/D', $i['isbn'] ?? '')) throw new Exception('Invalid book item');
             $c = $i['config'] ?? [];
             if (($c['approved'] ?? false) !== true || !in_array($c['size'] ?? '', ['A5','A4','B5','6x9','B6'], true) || !in_array($c['lamination'] ?? '', ['Matte','Gloss'], true) || !is_string($c['paper'] ?? null) || strlen($c['paper']) > 120 || !self::integer($c['gsm'] ?? null, 50, 400)) throw new Exception('Invalid approved print specification');
@@ -99,15 +111,17 @@ final class OSP_Print_Connector {
             if ($prior) {
                 if (!hash_equals($prior->payload_hash, $hash)) return new WP_Error('osp_conflict','The same source reference has different files or specifications',['status'=>409]);
                 if ($prior->state !== 'ready' || !$prior->order_id || !wc_get_order($prior->order_id)) return new WP_Error('osp_review','A previous import requires manual reconciliation; do not recreate it',['status'=>409]);
-                return ['id'=>(int)$prior->order_id,'sourceOrder'=>$source,'payloadHash'=>$hash,'duplicate'=>true];
+                return ['id'=>(int)$prior->order_id,'sourceOrder'=>$source,'payloadHash'=>$hash,'duplicate'=>true,'testMode'=>wc_get_order($prior->order_id)->get_meta('_osp_test_mode')==='yes'];
             }
             $product=wc_get_product(12982);
             if (!$product || $product->get_status() !== 'publish') throw new Exception('Perfect-binding product 12982 is unavailable');
             // Reserve before creating. A crash leaves a visible reconciliation block, never another order.
             if (!$wpdb->insert($table,['source_order'=>$source,'payload_hash'=>$hash,'state'=>'creating','created'=>current_time('mysql',true)])) throw new Exception('Unable to reserve source reference');
+            $test=($p['testMode']??false)===true;
             $order=new WC_Order();
+            if ($test) $order->update_meta_data('_osp_test_mode','yes');
             $order->set_created_via('openshelf'); $order->set_currency('INR'); $order->set_status('on-hold');
-            $order->set_payment_method('osp_internal_settlement'); $order->set_payment_method_title('OpenShelf internal settlement — pending printer review');
+            $order->set_payment_method('osp_internal_settlement'); $order->set_payment_method_title($test?'TEST ONLY - no payment taken':'OpenShelf internal settlement — pending printer review');
             $order->update_meta_data('_osp_source_order',$source); $order->update_meta_data('_osp_payload_hash',$hash);
             $order->update_meta_data('_osp_payload',$p); $order->update_meta_data('_osp_stage','Awaiting approval'); $order->update_meta_data('_osp_revision',1);
             $names=preg_split('/\s+/',trim($p['delivery']['name']),2);
@@ -132,9 +146,9 @@ final class OSP_Print_Connector {
             $order->calculate_totals(false); $order->save();
             // Compatibility with the observed Shiprocket legacy weight reader; never alter shared product weight.
             update_post_meta($order->get_id(),'wf_order_weight',$grams/1000); update_post_meta($order->get_id(),'_order_weight',$grams/1000);
-            $order->add_order_note('Imported from OpenShelf. Customer paid OpenShelf; production settlement is separate. Check approved PDFs, production estimate, tax treatment, package weight and shipping before release.');
+            $order->add_order_note($test?'TEST ONLY - synthetic connector exercise. Placeholder ISBN is not allocated. No customer payment, print release or courier booking. All stages are simulated; cancel after testing.':'Imported from OpenShelf. Customer paid OpenShelf; production settlement is separate. Check approved PDFs, production estimate, tax treatment, package weight and shipping before release.');
             if ($wpdb->update($table,['state'=>'ready'],['source_order'=>$source]) === false) throw new Exception('Unable to finalise import');
-            return ['id'=>$order->get_id(),'sourceOrder'=>$source,'payloadHash'=>$hash];
+            return ['id'=>$order->get_id(),'sourceOrder'=>$source,'payloadHash'=>$hash,'testMode'=>$test];
         } catch (Throwable $e) { return new WP_Error('osp_review','Import requires printer review; inspect the source reference before retrying',['status'=>409]); }
         finally { $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock)); }
     }
@@ -146,7 +160,7 @@ final class OSP_Print_Connector {
     public static function status($request) {
         $order=wc_get_order((int)$request['id']);
         if (!$order || $order->get_created_via() !== 'openshelf') return new WP_Error('osp_missing','Order not found',['status'=>404]);
-        return ['id'=>$order->get_id(),'sourceOrder'=>$order->get_meta('_osp_source_order'),'stage'=>$order->get_meta('_osp_stage'),'revision'=>(int)$order->get_meta('_osp_revision'),'carrier'=>$order->get_meta('_osp_carrier'),'tracking'=>$order->get_meta('_osp_tracking'),'trackingURL'=>$order->get_meta('_osp_tracking_url')];
+        return ['id'=>$order->get_id(),'sourceOrder'=>$order->get_meta('_osp_source_order'),'stage'=>$order->get_meta('_osp_stage'),'revision'=>(int)$order->get_meta('_osp_revision'),'carrier'=>$order->get_meta('_osp_carrier'),'tracking'=>$order->get_meta('_osp_tracking'),'trackingURL'=>$order->get_meta('_osp_tracking_url'),'testMode'=>$order->get_meta('_osp_test_mode')==='yes','woocommerceStatus'=>$order->get_status()];
     }
     public static function boxes() {
         foreach (['shop_order','woocommerce_page_wc-orders'] as $screen) add_meta_box('osp-production','OpenShelf production',[__CLASS__,'box'],$screen,'normal','high');
@@ -154,6 +168,7 @@ final class OSP_Print_Connector {
     public static function box($object) {
         $order=$object instanceof WC_Order ? $object : wc_get_order($object->ID);
         if (!$order || $order->get_created_via() !== 'openshelf') { echo '<p>Not an OpenShelf fulfilment order.</p>'; return; }
+        if ($order->get_meta('_osp_test_mode')==='yes') { echo '<p><strong>TEST ONLY — DO NOT PRINT OR SHIP.</strong> No payment has been taken. The placeholder ISBN is not allocated. Stages are simulated from OpenShelf; this order stays on hold until test cleanup cancels it.</p>'; return; }
         $stage=$order->get_meta('_osp_stage'); $next=array_search($stage,self::STAGES,true)+1;
         echo '<p><strong>'.esc_html($order->get_meta('_osp_source_order')).'</strong> · '.esc_html($stage).'</p><p>Customer payment stays in OpenShelf. These totals are estimated production charges, excluding shipping and tax. Approve the charge/settlement and exact PDFs before printing.</p>';
         if ($next >= count(self::STAGES)) return;
@@ -169,6 +184,7 @@ final class OSP_Print_Connector {
         if (!current_user_can('manage_woocommerce')) wp_die('Not authorised',403);
         $id=absint($_POST['osp_order']??0); check_admin_referer('osp_stage_'.$id,'osp_nonce');
         $order=wc_get_order($id); if (!$order || $order->get_created_via()!=='openshelf') wp_die('Order not found');
+        if ($order->get_meta('_osp_test_mode')==='yes') wp_die('Use the isolated OpenShelf test controls; physical print release is disabled');
         global $wpdb; $lock='osp_stage_'.$id;
         if ((int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,5)',$lock))!==1) wp_die('Stage is busy; refresh');
         try {
@@ -187,6 +203,51 @@ final class OSP_Print_Connector {
         } finally { $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock)); }
         wp_safe_redirect($order->get_edit_order_url()); exit;
     }
+
+    public static function hold_test($order) {
+        if ($order instanceof WC_Order && $order->get_meta('_osp_test_mode')==='yes' && !in_array($order->get_status(),['on-hold','cancelled'],true)) $order->set_status('on-hold');
+    }
+    private static function test_order($request) {
+        $order=wc_get_order((int)$request['id']);
+        if (!$order || $order->get_created_via()!=='openshelf' || $order->get_meta('_osp_test_mode')!=='yes' || !preg_match('/^osp-test-[a-f0-9-]{36}$/D',$order->get_meta('_osp_source_order'))) throw new Exception('Not an isolated test order');
+        return $order;
+    }
+    public static function test_stage($request) {
+        global $wpdb; $lock='osp_stage_'.(int)$request['id'];
+        if ((int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,5)',$lock))!==1) return new WP_Error('osp_busy','Test stage busy',['status'=>409]);
+        try {
+            $order=self::test_order($request); $b=$request->get_json_params();
+            $index=array_search($order->get_meta('_osp_stage'),self::STAGES,true);
+            if ($order->get_status()!=='on-hold' || $index===false || (self::STAGES[$index+1]??null)!==($b['stage']??'') || ($b['revision']??0)!==(int)$order->get_meta('_osp_revision')) throw new Exception('Refresh the test before advancing one stage');
+            $order->update_meta_data('_osp_stage',$b['stage']); $order->update_meta_data('_osp_revision',(int)$order->get_meta('_osp_revision')+1);
+            if (in_array($b['stage'],['Dispatched','Delivered'],true)) { $order->update_meta_data('_osp_carrier','TEST ONLY'); $order->update_meta_data('_osp_tracking','TEST-NOT-A-SHIPMENT'); }
+            $order->set_status('on-hold'); $order->save(); $order->add_order_note('TEST ONLY: simulated '.$b['stage'].'; no physical production or shipment.');
+            return self::status($request);
+        } catch (Throwable $e) { return new WP_Error('osp_test',$e->getMessage(),['status'=>409]); }
+        finally { $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock)); }
+    }
+    public static function test_cancel($request) {
+        global $wpdb; $lock='osp_stage_'.(int)$request['id'];
+        if ((int)$wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s,5)',$lock))!==1) return new WP_Error('osp_busy','Test busy',['status'=>409]);
+        try { $order=self::test_order($request); $order->set_status('cancelled'); $order->save(); $order->add_order_note('TEST ONLY: connector exercise cancelled; no money moved.'); return self::status($request); }
+        catch (Throwable $e) { return new WP_Error('osp_test',$e->getMessage(),['status'=>400]); }
+        finally { $wpdb->get_var($wpdb->prepare('SELECT RELEASE_LOCK(%s)',$lock)); }
+    }
+    private static function fetch_file($order,$index,$kind) {
+        $query=http_build_query(['order'=>$order->get_meta('_osp_source_order'),'item'=>$index,'kind'=>$kind],'','&',PHP_QUERY_RFC3986);
+        $path='/api/printing/files?'.$query; $timestamp=(string)time();
+        $message=implode("\n",[$timestamp,'GET',$path,hash('sha256','')]);
+        $response=wp_remote_get('https://openshelfpress.com'.$path,['timeout'=>30,'redirection'=>0,'limit_response_size'=>16*1024*1024,'headers'=>['X-OSP-Timestamp'=>$timestamp,'X-OSP-Signature'=>hash_hmac('sha256',$message,self::secret())]]);
+        if (is_wp_error($response)||wp_remote_retrieve_response_code($response)!==200) throw new Exception('Unable to retrieve the approved PDF');
+        $body=wp_remote_retrieve_body($response); if (substr($body,0,5)!=='%PDF-') throw new Exception('The file is not a PDF');
+        return $body;
+    }
+    public static function test_check($request) {
+        try { $order=self::test_order($request); if($order->get_status()!=='on-hold')throw new Exception('Test is not held'); $p=$order->get_meta('_osp_payload'); $files=[];
+            foreach (['interior','cover'] as $kind) { $body=self::fetch_file($order,0,$kind); if(!hash_equals($p['items'][0]['files'][$kind]['sha256'],hash('sha256',$body))) throw new Exception('Test PDF digest mismatch'); $files[$kind]=true; }
+            return ['testMode'=>true,'sourceOrder'=>$order->get_meta('_osp_source_order'),'files'=>$files];
+        } catch (Throwable $e) { return new WP_Error('osp_test',$e->getMessage(),['status'=>400]); }
+    }
     public static function download() {
         if (!current_user_can('manage_woocommerce')) wp_die('Not authorised',403);
         $order=wc_get_order(absint($_GET['order']??0));
@@ -194,12 +255,7 @@ final class OSP_Print_Connector {
         $kind=sanitize_key($_GET['kind']??'');
         if (!$order || $order->get_created_via()!=='openshelf' || $index===false || $index<0 || !in_array($kind,['interior','cover'],true) || !isset($order->get_meta('_osp_payload')['items'][$index])) wp_die('File not found');
         if (strlen(self::secret())<32 || !defined('OSP_CONNECTOR_ENABLED') || OSP_CONNECTOR_ENABLED!==true) wp_die('Connector disabled');
-        $query=http_build_query(['order'=>$order->get_meta('_osp_source_order'),'item'=>$index,'kind'=>$kind],'','&',PHP_QUERY_RFC3986);
-        $path='/api/printing/files?'.$query; $timestamp=(string)time();
-        $message=implode("\n",[$timestamp,'GET',$path,hash('sha256','')]);
-        $response=wp_remote_get('https://openshelfpress.com'.$path,['timeout'=>30,'redirection'=>0,'limit_response_size'=>16*1024*1024,'headers'=>['X-OSP-Timestamp'=>$timestamp,'X-OSP-Signature'=>hash_hmac('sha256',$message,self::secret())]]);
-        if (is_wp_error($response)||wp_remote_retrieve_response_code($response)!==200) wp_die('Unable to retrieve the approved PDF. Check the OpenShelf connection.');
-        $body=wp_remote_retrieve_body($response); if (substr($body,0,5)!=='%PDF-') wp_die('The approved file is not a PDF');
+        try { $body=self::fetch_file($order,$index,$kind); } catch (Throwable $e) { wp_die('Unable to retrieve the approved PDF. Check the OpenShelf connection.'); }
         $p=$order->get_meta('_osp_payload'); $filename=sanitize_file_name($p['items'][$index]['files'][$kind]['filename']);
         nocache_headers(); header('Content-Type: application/pdf'); header('X-Content-Type-Options: nosniff'); header('Content-Disposition: attachment; filename="'.$filename.'"'); echo $body; exit;
     }
