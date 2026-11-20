@@ -12,7 +12,7 @@ export default function PrintingPanel({record:r,refresh,onMessage,onError}:{reco
   const job=jobs.find(j=>j.order_id===r.id),c=r.data.printingConfig||{};
   return <section className="panel"><h2>OnlinePrintingz connection</h2><p>{status?.enabled?'Active · printer approval required':'Not activated · no automatic printing transfer'}</p>
     {r.kind==='Publishing'?<form key={r.version} onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);act({action:'configure-edition',version:r.version,config:{size:f.get('size'),paper:f.get('paper'),gsm:Number(f.get('gsm')),blackPages:Number(f.get('blackPages')),colourPages:Number(f.get('colourPages')),lamination:f.get('lamination'),unitWeightGrams:Number(f.get('weight')),approved:f.get('approved')==='on'}})}}>
-      <p>Approve the actual trim-to-price mapping and paper before accepting orders. Custom sizes have no automatic substitute. Only perfect-bound paperback editions with final approved PDFs are supported.</p>
+      <p>Approve the actual trim-to-price mapping and paper before accepting orders. Custom sizes have no automatic substitute. Paperback (perfect-bound) and Hardcase (case-bound, A4/A5) editions with final approved PDFs are supported.</p>
       <div className="form-grid">
         <label>Priced size<select name="size" defaultValue={c.size||''} required><option value="">Choose size</option>{['A5','A4','B5','6x9','B6'].map(v=><option key={v}>{v}</option>)}</select></label>
         <label>Paper specification<input name="paper" defaultValue={c.paper||''} maxLength={120} required placeholder="e.g. cream uncoated"/></label>

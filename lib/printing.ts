@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Existing D1 JSON record boundary; network fields are validated before use. */
 import {db,secrets,record,staff,audit,update} from './server';
-import {printConfig,printCost,printAddress,nextPrintStage,digest,signedHeaders} from './printing-contract';
+import {printConfig,printCost,printAddress,printBinding,printProducts,nextPrintStage,digest,signedHeaders} from './printing-contract';
 
 export const printingEnabled=()=>secrets().PRINTING_ENABLED==='1';
-export function printingStatus(){return {enabled:printingEnabled(),configured:!!(secrets().PRINTING_SECRET?.length>=32),productId:12982,mode:'Staff approval required'}}
+export function printingStatus(){return {enabled:printingEnabled(),configured:!!(secrets().PRINTING_SECRET?.length>=32),products:printProducts,mode:'Staff approval required'}}
 const now=()=>new Date().toISOString();
 
 // Build on the server from the catalogue and proof records; never trust client file IDs.
@@ -15,7 +15,9 @@ export async function snapshotPrintItems(items:any[],authorCopies=false) {
     const book=authorCopies?listing:await record(listing.data.bookReference);
     const d=book.data;
     if (book.kind!=='Publishing'||!['In production','Ready to ship','Dispatched','Delivered','Completed','Published'].includes(book.status)||!d.isbn||!d.proofAccepted||d.proofISBN!==d.isbn) throw Error('Edition final proof and ISBN are not ready for printing');
-    if (d.binding!=='Paperback') throw Error('The first connector supports perfect-bound paperbacks only');
+    // The ordered edition decides the binding: bookstore listing, else the explicit author-copy choice, else the book's own binding.
+    const binding=printBinding(authorCopies?(item.binding||d.binding):(listing.data.binding||d.binding));
+    if (authorCopies&&!(d.formats||[d.binding]).includes(binding)) throw Error('This book is not published in the requested binding');
     const config=printConfig(d.printingConfig,d.pageCount);
     // The price-size mapping is explicitly staff approved; the physical trim stays visible too.
     const files:any={};
@@ -29,8 +31,8 @@ export async function snapshotPrintItems(items:any[],authorCopies=false) {
       if(!chosen)throw Error('The exact author-approved interior and final cover PDFs are required');
       files[key]={id:chosen.id,version:chosen.version,key:chosen.data.fileKey,filename:chosen.data.filename||key+'.pdf'};
     }
-    const cost=printCost(config,item.qty);
-    result.push({listingId:item.id,bookId:book.id,title:d.title,isbn:d.isbn,editionVersion:book.version,trimSize:d.trimSize,copies:item.qty,config,cost,files});
+    const cost=printCost(config,item.qty,binding);
+    result.push({listingId:item.id,bookId:book.id,title:d.title,isbn:d.isbn,editionVersion:book.version,trimSize:d.trimSize,binding,copies:item.qty,config,cost,files});
   }
   return result;
 }
@@ -67,7 +69,7 @@ export async function transferPrintJob(id:string) {
     if(!snapshot)throw Error('Locked print snapshot is missing');
     const items=JSON.parse(snapshot.payload);
     for(const item of items)for(const file of Object.values(item.files) as any[])if(!await secrets().BUCKET.head(file.key))throw Error('An approved print PDF is missing from storage');
-    const publicItems=items.map(({files,...item}:any,index:number)=>({...item,index,productId:12982,files:{interior:{version:files.interior.version,filename:files.interior.filename},cover:{version:files.cover.version,filename:files.cover.filename}}}));
+    const publicItems=items.map(({files,...item}:any,index:number)=>({...item,index,productId:printProducts[printBinding(item.binding||'Paperback')],binding:printBinding(item.binding||'Paperback'),files:{interior:{version:files.interior.version,filename:files.interior.filename},cover:{version:files.cover.version,filename:files.cover.filename}}}));
     const payload={schema:1,sourceOrder:id,delivery:printAddress(order.data),items:publicItems,mode:'hold',currency:'INR'};
     const body=JSON.stringify(payload),payloadHash=await digest(body);
     const remote=await printRequest('POST','/orders',body);

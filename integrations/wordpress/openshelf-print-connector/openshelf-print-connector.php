@@ -9,6 +9,8 @@
 defined('ABSPATH') || exit;
 
 final class OSP_Print_Connector {
+    const PRODUCTS = ['Paperback' => 12982, 'Hardcase' => 14195];
+    const CASE_BIND = ['A5' => 22500, 'A4' => 25000];
     const STAGES = ['Awaiting approval', 'In production', 'Ready to ship', 'Dispatched', 'Delivered'];
     public static function boot() {
         add_action('rest_api_init', [__CLASS__, 'routes']);
@@ -69,22 +71,24 @@ final class OSP_Print_Connector {
         foreach (['name','address','city','state','pin','phone'] as $k) if (!is_string($d[$k] ?? null) || trim($d[$k]) === '' || strlen($d[$k]) > 1000) throw new Exception('Incomplete delivery address');
         if (($d['country'] ?? '') !== 'IN' || !preg_match('/^[1-9]\d{5}$/D', $d['pin']) || !preg_match('/^[0-9 +()-]{10,16}$/D', $d['phone'])) throw new Exception('Invalid delivery PIN or phone');
         foreach ($p['items'] as $index => $i) {
-            if (($i['productId'] ?? 0) !== 12982 || ($i['index'] ?? -1) !== $index || !self::integer($i['copies'] ?? null, 1, 10000) || !is_string($i['title'] ?? null) || strlen($i['title']) > 300 || !preg_match('/^97[89]\d{10}$/D', $i['isbn'] ?? '')) throw new Exception('Invalid book item');
+            $binding = $i['binding'] ?? 'Paperback';
+            if (!isset(self::PRODUCTS[$binding]) || ($i['productId'] ?? 0) !== self::PRODUCTS[$binding] || ($i['index'] ?? -1) !== $index || !self::integer($i['copies'] ?? null, 1, 10000) || !is_string($i['title'] ?? null) || strlen($i['title']) > 300 || !preg_match('/^97[89]\d{10}$/D', $i['isbn'] ?? '')) throw new Exception('Invalid book item');
             $c = $i['config'] ?? [];
             if (($c['approved'] ?? false) !== true || !in_array($c['size'] ?? '', ['A5','A4','B5','6x9','B6'], true) || !in_array($c['lamination'] ?? '', ['Matte','Gloss'], true) || !is_string($c['paper'] ?? null) || strlen($c['paper']) > 120 || !self::integer($c['gsm'] ?? null, 50, 400)) throw new Exception('Invalid approved print specification');
             if (!self::integer($c['blackPages'] ?? null, 0, 2000) || !self::integer($c['colourPages'] ?? null, 0, 2000) || $c['blackPages'] + $c['colourPages'] < 24 || $c['blackPages'] + $c['colourPages'] > 2000 || !is_numeric($c['unitWeightGrams'] ?? null) || $c['unitWeightGrams'] <= 0 || $c['unitWeightGrams'] > 10000) throw new Exception('Invalid pages or weight');
-            $cost = self::cost($c, $i['copies']);
+            if ($binding === 'Hardcase' && !isset(self::CASE_BIND[$c['size']])) throw new Exception('No approved hardcase rate for this size');
+            $cost = self::cost($c, $i['copies'], $binding);
             if (($i['cost']['unitPaise'] ?? null) !== $cost || ($i['cost']['totalPaise'] ?? null) !== $cost * $i['copies']) throw new Exception('Production cost does not match approved rates');
             foreach (['interior','cover'] as $kind) if (!self::integer($i['files'][$kind]['version'] ?? null, 1, PHP_INT_MAX) || !is_string($i['files'][$kind]['filename'] ?? null)) throw new Exception('Missing approved PDF version');
         }
     }
-    public static function cost($c, $copies) {
+    public static function cost($c, $copies, $binding = 'Paperback') {
         $rates = ['A5'=>[35,42,40], 'A4'=>[70,76,75], 'B5'=>[45,52,50], '6x9'=>[45,52,50], 'B6'=>[25,32,30]];
         $pages = $c['blackPages'] + $c['colourPages'];
         $band = $pages <= 500 ? 0 : ($pages <= 1000 ? 1 : 2);
         $small = in_array($c['size'], ['A5','B6'], true);
-        $binding = $small ? ([4000,2800,3400,2800,3000][$copies-1] ?? 2500) : ($copies < 10 ? 4200 : ($copies < 100 ? 4000 : 3400));
-        return $c['blackPages']*$rates[$c['size']][$band] + $c['colourPages']*($small ? 500 : 1000) + $binding;
+        $bind = $binding === 'Hardcase' ? self::CASE_BIND[$c['size']] : ($small ? ([4000,2800,3400,2800,3000][$copies-1] ?? 2500) : ($copies < 10 ? 4200 : ($copies < 100 ? 4000 : 3400)));
+        return $c['blackPages']*$rates[$c['size']][$band] + $c['colourPages']*($small ? 500 : 1000) + $bind;
     }
     public static function receive($request) {
         global $wpdb;
@@ -101,8 +105,12 @@ final class OSP_Print_Connector {
                 if ($prior->state !== 'ready' || !$prior->order_id || !wc_get_order($prior->order_id)) return new WP_Error('osp_review','A previous import requires manual reconciliation; do not recreate it',['status'=>409]);
                 return ['id'=>(int)$prior->order_id,'sourceOrder'=>$source,'payloadHash'=>$hash,'duplicate'=>true];
             }
-            $product=wc_get_product(12982);
-            if (!$product || $product->get_status() !== 'publish') throw new Exception('Perfect-binding product 12982 is unavailable');
+            $products=[];
+            foreach ($p['items'] as $i) {
+                $pid=self::PRODUCTS[$i['binding'] ?? 'Paperback'];
+                $products[$pid]=$products[$pid] ?? wc_get_product($pid);
+                if (!$products[$pid] || $products[$pid]->get_status() !== 'publish') throw new Exception('Print product '.$pid.' is unavailable');
+            }
             // Reserve before creating. A crash leaves a visible reconciliation block, never another order.
             if (!$wpdb->insert($table,['source_order'=>$source,'payload_hash'=>$hash,'state'=>'creating','created'=>current_time('mysql',true)])) throw new Exception('Unable to reserve source reference');
             $order=new WC_Order();
@@ -118,10 +126,10 @@ final class OSP_Print_Connector {
             $wpdb->update($table,['order_id'=>$order->get_id()],['source_order'=>$source]);
             $grams=0;
             foreach ($p['items'] as $i) {
-                $c=$i['config']; $item=new WC_Order_Item_Product(); $item->set_product($product); $item->set_name($i['title']); $item->set_quantity($i['copies']);
+                $c=$i['config']; $item=new WC_Order_Item_Product(); $item->set_product($products[self::PRODUCTS[$i['binding'] ?? 'Paperback']]); $item->set_name($i['title']); $item->set_quantity($i['copies']);
                 $total=$i['cost']['totalPaise']/100;
                 $item->set_subtotal($total); $item->set_total($total); $item->set_taxes(['total'=>[],'subtotal'=>[]]);
-                $meta=['Print Size'=>$c['size'],'Trim Size'=>$i['trimSize']??'','Paper'=>$c['paper'].' '.$c['gsm'].' GSM','Binding'=>'Perfect Binding','B&W Inner Pages'=>(string)$c['blackPages'],'Color Inner Pages'=>(string)$c['colourPages'],'No. of Pages'=>(string)($c['blackPages']+$c['colourPages']),'Copies'=>(string)$i['copies'],'Lamination'=>$c['lamination'],'ISBN'=>$i['isbn'],'Shipping'=>'Shipping — printer books dispatch','Upload Status'=>'received','OpenShelf Reference'=>$source,'Production Pricing'=>'Estimate excludes shipping and taxes; staff must review'];
+                $meta=['Print Size'=>$c['size'],'Trim Size'=>$i['trimSize']??'','Paper'=>$c['paper'].' '.$c['gsm'].' GSM','Binding'=>(($i['binding'] ?? 'Paperback')==='Hardcase' ? 'Case Binding (Hardcase)' : 'Perfect Binding'),'B&W Inner Pages'=>(string)$c['blackPages'],'Color Inner Pages'=>(string)$c['colourPages'],'No. of Pages'=>(string)($c['blackPages']+$c['colourPages']),'Copies'=>(string)$i['copies'],'Lamination'=>$c['lamination'],'ISBN'=>$i['isbn'],'Shipping'=>'Shipping — printer books dispatch','Upload Status'=>'received','OpenShelf Reference'=>$source,'Production Pricing'=>'Estimate excludes shipping and taxes; staff must review'];
                 foreach (['interior'=>'Content File','cover'=>'Cover File'] as $kind=>$label) $meta[$label]=add_query_arg(['action'=>'osp_file','order'=>$order->get_id(),'item'=>$i['index'],'kind'=>$kind],admin_url('admin-post.php'));
                 foreach ($meta as $k=>$v) $item->add_meta_data($k,$v,true);
                 $weight=$c['unitWeightGrams']*$i['copies']; $grams+=$weight;

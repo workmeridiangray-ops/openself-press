@@ -53,6 +53,11 @@ $c=['size'=>'A5','paper'=>'Cream','gsm'=>80,'blackPages'=>100,'colourPages'=>0,'
 $p=['schema'=>1,'mode'=>'hold','currency'=>'INR','sourceOrder'=>'synthetic-order','delivery'=>['name'=>'Synthetic Recipient','address'=>'Synthetic street','city'=>'Kolkata','state'=>'WB','pin'=>'700001','phone'=>'9000000000','country'=>'IN'],'items'=>[['index'=>0,'productId'=>12982,'title'=>'Synthetic Dynamic GK','isbn'=>'9780306406157','trimSize'=>'A5','copies'=>2,'config'=>$c,'cost'=>['unitPaise'=>6300,'totalPaise'=>12600],'files'=>['interior'=>['version'=>1,'filename'=>'interior.pdf'],'cover'=>['version'=>1,'filename'=>'cover.pdf']]]]];
 eq(OSP_Print_Connector::cost($c,1),7500);eq(OSP_Print_Connector::cost($c,2),6300);eq(OSP_Print_Connector::cost($c,3),6900);eq(OSP_Print_Connector::cost($c,6),6000);
 $bad=$p;$bad['items'][0]['cost']['unitPaise']=1;fails(fn()=>OSP_Print_Connector::validate($bad));
+$h=$p;$h['sourceOrder']='hardcase-order';$h['items'][0]['binding']='Hardcase';$h['items'][0]['productId']=14195;$h['items'][0]['cost']=['unitPaise'=>26000,'totalPaise'=>52000];
+eq(OSP_Print_Connector::cost($c,2,'Hardcase'),26000);OSP_Print_Connector::validate($h);$n++;
+$bad=$h;$bad['items'][0]['productId']=12982;fails(fn()=>OSP_Print_Connector::validate($bad));
+$bad=$h;$bad['items'][0]['config']['size']='B5';$bad['items'][0]['cost']=['unitPaise'=>1,'totalPaise'=>2];fails(fn()=>OSP_Print_Connector::validate($bad));
+$bad=$p;$bad['items'][0]['binding']='Spiral';fails(fn()=>OSP_Print_Connector::validate($bad));
 $bad=$p;$bad['items'][0]['productId']=1;fails(fn()=>OSP_Print_Connector::validate($bad));
 $bad=$p;$bad['items'][0]['config']['size']='8x10';fails(fn()=>OSP_Print_Connector::validate($bad));
 $bad=$p;$bad['items'][0]['config']['approved']=false;fails(fn()=>OSP_Print_Connector::validate($bad));
@@ -75,4 +80,6 @@ eq(OSP_Print_Connector::receive($broken)->code,'osp_review');eq(count($orders),2
 eq(OSP_Print_Connector::receive($broken)->code,'osp_review');eq(count($orders),2);
 $status=OSP_Print_Connector::status(new Request('',[],101));eq($status['stage'],'Awaiting approval');eq($status['revision'],1);eq($status['sourceOrder'],'synthetic-order');
 eq(($hooks['woocommerce_email_enabled_customer_on_hold_order'])(true,$orders[101]),false);eq(($hooks['woocommerce_order_needs_payment'])(true,$orders[101]),false);
+$hreq=new Request(json_encode($h));$time2=(string)time();
+$hr=OSP_Print_Connector::receive($hreq);eq(is_array($hr),true);eq($orders[$hr['id']]->items[0]->meta['Binding'],'Case Binding (Hardcase)');eq($orders[$hr['id']]->total,520);
 echo "$n WordPress receiver checks passed (WordPress/WooCommerce adapters; no live calls)\n";

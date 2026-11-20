@@ -21,6 +21,8 @@ const config={size:'A5',paper:'Cream uncoated',gsm:80,blackPages:100,colourPages
 eq(contract.printCost(config,1).totalPaise,7500);eq(contract.printCost(config,2).totalPaise,12600);eq(contract.printCost(config,3).totalPaise,20700);eq(contract.printCost(config,6).totalPaise,36000);
 eq(contract.printCost({...config,size:'A4'},10).bindingPaise,4000);eq(contract.printCost({...config,size:'A4'},100).bindingPaise,3400);
 eq(contract.printCost({...config,blackPages:501},1).unitPaise,25042);eq(contract.printCost({...config,blackPages:1001},1).unitPaise,44040);
+eq(contract.printCost(config,2,'Hardcase').totalPaise,52000);eq(contract.printCost({...config,size:'A4'},1,'Hardcase').bindingPaise,25000);eq(contract.printProducts.Hardcase,14195);eq(contract.printProducts.Paperback,12982);
+throws(()=>contract.printCost({...config,size:'B5'},1,'Hardcase'),/hardcase rate/);throws(()=>contract.printBinding('Spiral'),/Paperback and Hardcase/);
 throws(()=>contract.printConfig({...config,size:'8x10'},100),/priced/);throws(()=>contract.printConfig({...config,blackPages:99},100),/equal/);throws(()=>contract.printConfig({...config,approved:false},100),/approve/);throws(()=>contract.printConfig({...config,unitWeightGrams:0},100),/weight/);
 const reqPath='/api/printing/files?order=test&item=0&kind=interior';const signed=await contract.signedHeaders(__env.PRINTING_SECRET,'GET',reqPath,'');
 eq(await contract.authenticatePrintRequest(new Request('https://openshelfpress.com'+reqPath,{headers:signed}),__env.PRINTING_SECRET),true);
@@ -31,6 +33,9 @@ const interior=await server.create('author','Files','Approved',{bookReference:bo
 await server.change(await server.record(book),'Published',{...(await server.record(book)).data,proofFiles:[{id:interior,version:1},{id:cover,version:1}]});
 const listing=await server.create('editor','Catalogue','Published',{title:'Synthetic Dynamic GK test',pricePaise:24900,stock:10,bookReference:book});
 const snapshot=await printing.snapshotPrintItems([{id:listing,qty:2}]);eq(snapshot[0].files.interior.key,'interior-v1');eq(snapshot[0].cost.totalPaise,12600);
+const hardListing=await server.create('editor','Catalogue','Published',{title:'Synthetic hardcase',pricePaise:44900,stock:10,bookReference:book,binding:'Hardcase'});
+const hard=await printing.snapshotPrintItems([{id:hardListing,qty:2}]);eq(hard[0].binding,'Hardcase');eq(hard[0].cost.totalPaise,52000);eq(snapshot[0].binding,'Paperback');
+await rejects(()=>printing.snapshotPrintItems([{id:book,qty:1,binding:'Hardcase'}],true),/not published in the requested binding/);
 let file=await server.record(cover);await server.change(file,'Approved',{...file.data,reviewProof:true});await rejects(()=>printing.snapshotPrintItems([{id:listing,qty:2}]),/exact author-approved/);
 // Restore the synthetic fixture to the accepted version.
 sql.prepare("UPDATE records SET status='Approved',version=1,data=? WHERE id=?").run(JSON.stringify(file.data),cover);

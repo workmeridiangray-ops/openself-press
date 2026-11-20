@@ -2,6 +2,16 @@
 // Shared, provider-independent rules. Amounts are integer paise throughout.
 export const printStages = ['Awaiting approval','In production','Ready to ship','Dispatched','Delivered'] as const;
 export type PrintStage = typeof printStages[number];
+export const printBindings = ['Paperback','Hardcase'] as const;
+export type PrintBinding = typeof printBindings[number];
+// Online Printingz WooCommerce product per binding: Perfect Binding / Case Binding.
+export const printProducts: Record<PrintBinding, number> = {Paperback:12982,Hardcase:14195};
+// Supplied per-copy case-bind rates (paise). Sizes without a supplied rate are refused, never inferred.
+export const caseBindPaise: Record<string, number> = {A5:22500,A4:25000};
+export function printBinding(value: any): PrintBinding {
+  if (!printBindings.includes(value)) throw Error('Printing supports Paperback and Hardcase editions only');
+  return value as PrintBinding;
+}
 export type PrintConfig = {
   size: 'A5'|'A4'|'B5'|'6x9'|'B6'; paper: string; gsm: number;
   blackPages: number; colourPages: number; lamination: 'Matte'|'Gloss';
@@ -19,16 +29,17 @@ export function printConfig(value: any, pages: number): PrintConfig {
   if (!Number.isFinite(value.unitWeightGrams)||value.unitWeightGrams<=0||value.unitWeightGrams>10000) throw Error('Enter a positive per-copy weight in grams');
   return {size:value.size,paper:value.paper.trim(),gsm:value.gsm,blackPages:value.blackPages,colourPages:value.colourPages,lamination:value.lamination,unitWeightGrams:value.unitWeightGrams,approved:true};
 }
-export function printCost(c: PrintConfig, copies: number) {
+export function printCost(c: PrintConfig, copies: number, binding: PrintBinding = 'Paperback') {
   if (!Number.isInteger(copies)||copies<1||copies>10000) throw Error('Enter 1–10,000 copies');
   const pages=c.blackPages+c.colourPages;
   const band=pages<=500?0:pages<=1000?1:pages<=2000?2:-1;
   if (band<0) throw Error('No approved rate above 2,000 pages');
   const rates={A5:[35,42,40],A4:[70,76,75],B5:[45,52,50],'6x9':[45,52,50],B6:[25,32,30]};
   const small=['A5','B6'].includes(c.size);
-  const binding=small?([4000,2800,3400,2800,3000][copies-1]??2500):copies<10?4200:copies<100?4000:3400;
-  const unitPaise=c.blackPages*rates[c.size][band]+c.colourPages*(small?500:1000)+binding;
-  return {unitPaise,totalPaise:unitPaise*copies,bindingPaise:binding,excludes:'Shipping and taxes; production estimate pending printer review'};
+  if (binding==='Hardcase'&&!(c.size in caseBindPaise)) throw Error('No approved hardcase rate for size '+c.size);
+  const bind=binding==='Hardcase'?caseBindPaise[c.size]:small?([4000,2800,3400,2800,3000][copies-1]??2500):copies<10?4200:copies<100?4000:3400;
+  const unitPaise=c.blackPages*rates[c.size][band]+c.colourPages*(small?500:1000)+bind;
+  return {unitPaise,totalPaise:unitPaise*copies,bindingPaise:bind,excludes:'Shipping and taxes; production estimate pending printer review'};
 }
 export function printAddress(d:any) {
   const result:any={};
