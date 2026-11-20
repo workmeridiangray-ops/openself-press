@@ -41,7 +41,7 @@ let file=await server.record(cover);await server.change(file,'Approved',{...file
 sql.prepare("UPDATE records SET status='Approved',version=1,data=? WHERE id=?").run(JSON.stringify(file.data),cover);
 const address={name:'Synthetic Recipient',phone:'9000000000',address:'Synthetic test address',city:'Kolkata',state:'WB',pin:'700001',contactEmail:'reader@example.test'};
 const place=async(key)=>{const res=await platform.POST(new Request('https://openshelfpress.com/api/platform',{method:'POST',headers:{origin:'https://openshelfpress.com','Content-Type':'application/json'},body:JSON.stringify({action:'create',kind:'Orders',data:{title:'Synthetic test order',requestKey:key,items:[{id:listing,qty:2}],...address}})}));const v=await res.json();eq(res.status,200);return v.id};
-const order=await place('print-order');eq(await place('print-order'),order);eq((await server.record(listing)).data.stock,8);eq(sql.prepare('SELECT COUNT(*) n FROM printing_snapshots').get().n,1);
+const order=await place('print-order');eq(await place('print-order'),order);eq((await server.record(listing)).data.stock,8);{const o=(await server.record(order)).data;eq(o.handling,15);eq(o.total,o.subtotal+o.shipping+15)}eq(sql.prepare('SELECT COUNT(*) n FROM printing_snapshots').get().n,1);
 const locked=JSON.parse(sql.prepare('SELECT payload FROM printing_snapshots WHERE order_id=?').get(order).payload);eq(locked[0].files.cover.version,1);
 await rejects(()=>printing.transferPrintJob(order),/paid/);
 // Actual captured-payment handler, mocked provider only.
@@ -49,7 +49,7 @@ __env.RAZORPAY_KEY_ID='test';__env.RAZORPAY_KEY_SECRET='synthetic';let r=await s
 let network=0,transfers=0,remoteRevision=1,remoteStage='Awaiting approval',remoteId=456,payloads=[],failResponse=false;
 globalThis.fetch=async(url,options={})=>{
  network++;
- if(String(url).includes('api.razorpay.com'))return Response.json({id:'pay-synthetic',order_id:'rzp-order',currency:'INR',amount:54800,status:'captured'});
+ if(String(url).includes('api.razorpay.com'))return Response.json({id:'pay-synthetic',order_id:'rzp-order',currency:'INR',amount:56300,status:'captured'});
  if(String(url)==='https://onlineprintingz.in/wp-json/openshelf/v1/orders'){
   transfers++;const p=JSON.parse(options.body);payloads.push(p);
   assert(!options.body.includes('interior-v1'));assert(!options.body.includes('reader@example.test'));assert(!options.body.includes('249'));
