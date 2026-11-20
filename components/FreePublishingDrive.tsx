@@ -1,6 +1,7 @@
 'use client';
 import React,{useState} from 'react';
 import PhoneInput from './PhoneInput';
+import PartnerLogos from './PartnerLogos';
 import {ArrowLeft,ArrowRight,CheckCircle2,BookOpen,Sparkles,ShieldCheck} from 'lucide-react';
 
 const HOW_HEARD=['Instagram','Threads','Quora','Facebook','WhatsApp','A friend / word of mouth','Other'];
@@ -119,6 +120,7 @@ export default function FreePublishingDrive(){
       <article className="journey-card"><ShieldCheck size={25}/><h3>Printed and listed, free</h3><p>Free ISBN, free barcode, and your book properly distributed as a paperback and ebook — no publishing cost to you.</p></article>
     </div>
 
+    <PartnerLogos/>
     <section className="public-faq" style={{marginBottom:40}}>
       <h2>How this actually works</h2>
       {[
