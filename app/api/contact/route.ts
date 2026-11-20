@@ -1,6 +1,7 @@
 import {env} from 'cloudflare:workers';
 const STAFF=()=>String((env as any).STAFF_NOTIFY_EMAIL||'info@openshelfpress.com');
-const mail=async(to:string,subject:string,text:string)=>{try{const e:any=env;if(!e.RESEND_API_KEY||!e.EMAIL_FROM||!/^\S+@\S+\.\S+$/.test(String(to||'')))return;await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(8000),headers:{Authorization:'Bearer '+e.RESEND_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({from:e.EMAIL_FROM,to:[to],subject,text:text+'\n\n— Open Shelf Press\nQuestions? Write to info@openshelfpress.com'})})}catch{}};
+const emailReady=(e:any)=>!!(e?.EMAIL_FROM&&(e.BREVO_API_KEY||e.RESEND_API_KEY));
+const mail=async(to:string,subject:string,text:string)=>{try{const e:any=env;if(!emailReady(e)||!/^\S+@\S+\.\S+$/.test(String(to||'')))return;const {sendEmail}=await import('../../../lib/business');await sendEmail(e,{to,subject,text:text+'\n\n— Open Shelf Press\nQuestions? Write to info@openshelfpress.com',timeoutMs:8000})}catch{}};
 export const dynamic='force-dynamic';
 const db=()=>env.DB!;
 const json=(v:any,s=200)=>Response.json(v,{status:s,headers:{'Cache-Control':'no-store'}});

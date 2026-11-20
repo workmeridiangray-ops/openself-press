@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Existing D1 JSON record boundary; network fields are validated before use. */
 import {db,secrets,record,staff,audit,update} from './server';
+import {emailReady} from './business';
 import {printConfig,printCost,printAddress,printBinding,printProducts,nextPrintStage,digest,signedHeaders} from './printing-contract';
 
 export const printingEnabled=()=>secrets().PRINTING_ENABLED==='1';
@@ -114,7 +115,7 @@ export async function runPrintQueue(limit=10) {
   for(const row of rows)try{await transferPrintJob(row.order_id)}catch{/* persisted in the review queue */}
   const active=(await db().prepare("SELECT order_id FROM printing_jobs WHERE state='Transferred' ORDER BY updated LIMIT ?").bind(limit).all<any>()).results;
   for(const row of active)try{await syncPrintJob(row.order_id)}catch(e){await db().prepare('UPDATE printing_jobs SET last_error=?,updated=? WHERE order_id=?').bind(String((e as Error).message).slice(0,300),now(),row.order_id).run()}
-  if(secrets().RESEND_API_KEY&&secrets().EMAIL_FROM){const notices=(await db().prepare("SELECT id FROM records WHERE kind='Notifications' AND status IN ('Unsent','Failed') AND id LIKE 'print-notice-%' ORDER BY created LIMIT 10").all<any>()).results;for(const n of notices)try{const {sendNotification}=await import('./providers');await sendNotification(await record(n.id))}catch{/* existing notification queue keeps failures visible */}}
+  if(emailReady(secrets())){const notices=(await db().prepare("SELECT id FROM records WHERE kind='Notifications' AND status IN ('Unsent','Failed') AND id LIKE 'print-notice-%' ORDER BY created LIMIT 10").all<any>()).results;for(const n of notices)try{const {sendNotification}=await import('./providers');await sendNotification(await record(n.id))}catch{/* existing notification queue keeps failures visible */}}
   return {attempted:rows.length,synced:active.length};
 }
 export async function retryPrintJob(id:string,u:any) {

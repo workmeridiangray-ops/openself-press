@@ -3,6 +3,7 @@ import {Buffer} from 'node:buffer';
 import {headers} from 'next/headers';
 import {scrypt,timingSafeEqual,randomBytes,createHash} from 'node:crypto';
 import {getChatGPTUser} from '../app/chatgpt-auth';
+import {emailReady,sendEmail} from './business';
 const database=()=>env.DB!;
 export const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 export const randomToken=()=>randomBytes(32).toString('hex');
@@ -50,6 +51,6 @@ export async function loginNotice(account:any,method:string){
     if(await sendMail(account.email,'New sign-in to your Open Shelf Press account','Hi '+(account.display_name||'there')+',\n\nYour account was just signed in to using '+method+'.\nIf this was you, there is nothing to do. If not, reset your password or contact us straight away.')){
       await database().prepare('INSERT INTO activity VALUES(?,?,?,?,?)').bind(crypto.randomUUID(),id,account.email,'Sign-in email sent',new Date().toISOString()).run()}}catch{}
 }
-export function emailConfigured(){return !!((env as any).RESEND_API_KEY&&(env as any).EMAIL_FROM)}
-export async function sendAuthEmail(email:string,subject:string,message:string){if(!emailConfigured())throw Error('Account email delivery is not configured yet. Please contact the publishing team.');const response=await fetch('https://api.resend.com/emails',{method:'POST',signal:AbortSignal.timeout(10000),headers:{Authorization:'Bearer '+(env as any).RESEND_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({from:(env as any).EMAIL_FROM,to:[email],subject,text:message})});if(!response.ok)throw Error('Account email could not be sent. Please try again later.')}
+export function emailConfigured(){return emailReady(env as any)}
+export async function sendAuthEmail(email:string,subject:string,message:string){if(!emailConfigured())throw Error('Account email delivery is not configured yet. Please contact the publishing team.');const result=await sendEmail(env as any,{to:email,subject,text:message});if(!result.ok)throw Error('Account email could not be sent. Please try again later.')}
 export async function sendToken(account:any,purpose:'verify'|'reset',origin:string){const token=randomToken();const id=digest(token);const now=new Date().toISOString();await database().prepare('INSERT INTO author_tokens VALUES(?,?,?,?,?,NULL,?)').bind(id,account.id,purpose,account.auth_version,Date.now()+(purpose==='reset'?30*60000:24*3600000),now).run();try{await sendAuthEmail(account.email,purpose==='reset'?'Reset your author password':'Verify your author email',purpose==='reset'?'Open this link within 30 minutes to choose a new author password. If you did not request this, ignore this email.\n'+origin+'/reset-password#token='+token:'Confirm this address for your author account. This link expires in 24 hours.\n'+origin+'/verify-email#token='+token)}catch(error){await database().prepare('DELETE FROM author_tokens WHERE id=?').bind(id).run();throw error}}
