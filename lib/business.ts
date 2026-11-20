@@ -6,13 +6,13 @@ export async function hmac(secret:string,text:string){const k=await crypto.subtl
 export const safeURL=(s:unknown)=>{try{const u=new URL(String(s));if(u.protocol!=='https:')return '';return u.href}catch{return ''}};
 // Email delivery: Brevo (BREVO_API_KEY) if set, otherwise Resend (RESEND_API_KEY). Both need EMAIL_FROM, e.g. "Open Shelf Press <orders@example.com>".
 export const emailReady=(e:any)=>!!(e?.EMAIL_FROM&&(e.BREVO_API_KEY||e.RESEND_API_KEY));
-export async function sendEmail(e:any,m:{to:string,subject:string,text:string,key?:string,timeoutMs?:number}):Promise<{ok:boolean,id?:string,error?:string}>{
+export async function sendEmail(e:any,m:{to:string,subject:string,text:string,html?:string,key?:string,timeoutMs?:number}):Promise<{ok:boolean,id?:string,error?:string}>{
   const from=String(e.EMAIL_FROM||'').trim(),parsed=from.match(/^(.*)<([^>]+)>\s*$/),sender=parsed?{name:parsed[1].trim().replace(/^"|"$/g,'')||undefined,email:parsed[2].trim()}:{email:from};
   const signal=AbortSignal.timeout(m.timeoutMs||10000);
   const brevo=!!e.BREVO_API_KEY;
   const response=brevo
-    ?await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',signal,headers:{'api-key':e.BREVO_API_KEY,'Content-Type':'application/json',accept:'application/json'},body:JSON.stringify({sender,to:[{email:m.to}],subject:m.subject,textContent:m.text})})
-    :await fetch('https://api.resend.com/emails',{method:'POST',signal,headers:{Authorization:'Bearer '+e.RESEND_API_KEY,'Content-Type':'application/json',...(m.key?{'Idempotency-Key':m.key}:{})},body:JSON.stringify({from,to:[m.to],subject:m.subject,text:m.text})});
+    ?await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',signal,headers:{'api-key':e.BREVO_API_KEY,'Content-Type':'application/json',accept:'application/json'},body:JSON.stringify({sender,to:[{email:m.to}],subject:m.subject,textContent:m.text,...(m.html?{htmlContent:m.html}:{})})})
+    :await fetch('https://api.resend.com/emails',{method:'POST',signal,headers:{Authorization:'Bearer '+e.RESEND_API_KEY,'Content-Type':'application/json',...(m.key?{'Idempotency-Key':m.key}:{})},body:JSON.stringify({from,to:[m.to],subject:m.subject,text:m.text,...(m.html?{html:m.html}:{})})});
   const body:any=await response.json().catch(()=>({}));
   if(!response.ok)return {ok:false,error:String(body.message||'Provider rejected email')};
   return {ok:true,id:brevo?body.messageId:body.id};
