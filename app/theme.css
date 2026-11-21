@@ -326,3 +326,57 @@ body:not(.crm-mode) .author-final-files{background:#F8F9FB!important;border:1px 
 body:not(.crm-mode) .author-final-files h3{font-size:14px}
 body:not(.crm-mode) .author-final-files p,body:not(.crm-mode) .author-final-files .muted{color:var(--muted)!important}
 .copy-order-form .full[style]{background:#F8F9FB!important;border:1px solid #E3E6EC}
+
+/* ---------- Alignment and overflow guards (all public pages + studio) ---------- */
+body:not(.crm-mode) main :where(h1,h2,h3,h4,p,li,dd,dt,summary,small,strong,a,span,label){overflow-wrap:anywhere;word-break:normal}
+body:not(.crm-mode) main :where(.panel,section,article,div,form,li,details){min-width:0}
+body:not(.crm-mode) main :where(img,svg,video,iframe){max-width:100%}
+body:not(.crm-mode) .publishing-route-cards,body:not(.crm-mode) .plan-options{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}
+body:not(.crm-mode) .publishing-route-card .primary{max-width:100%;white-space:normal;text-align:center}
+body:not(.crm-mode) .journey-progress{grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr))!important}
+body:not(.crm-mode) .journey-progress li{min-width:0}
+body:not(.crm-mode) .checkbox{display:flex!important;align-items:flex-start!important;gap:10px}
+body:not(.crm-mode) .checkbox input{flex:0 0 auto;width:16px!important;height:16px;margin:2px 0 0!important}
+body:not(.crm-mode) .primary,body:not(.crm-mode) .osp-btn,body:not(.crm-mode) .studio-btn{max-width:100%}
+body:not(.crm-mode) .badge{white-space:nowrap}
+.osp-shelf{overflow:hidden;padding-left:4%;padding-right:4%}
+.osp-shelf-board{left:0;right:0}
+.studio-table td.studio-row-actions{white-space:nowrap}
+body:not(.crm-mode) .publishing-route-card .badge{white-space:normal}
+
+/* ---------- Inner public pages: one consistent, compact system ---------- */
+body:not(.crm-mode) .public-page-body{max-width:1200px}
+body:not(.crm-mode) .public-page-body>h1,body:not(.crm-mode) .public-publish-hero h1,body:not(.crm-mode) main.page-content h1{font-size:clamp(34px,3.6vw,48px);line-height:1.1;max-width:760px}
+body:not(.crm-mode) .lead,body:not(.crm-mode) .public-publish-hero .lead{font-size:17px;line-height:1.65;color:var(--muted);max-width:640px}
+body:not(.crm-mode) .public-route-icon{background:var(--lavender)!important;color:var(--indigo)!important;border-radius:10px!important;width:52px!important;height:52px!important}
+body:not(.crm-mode) .public-route-icon svg{width:24px;height:24px}
+body:not(.crm-mode) .publishing-route-card{border-radius:10px!important;padding:28px!important;border-color:var(--line)}
+body:not(.crm-mode) .publishing-route-card h2{font-family:var(--serif);font-size:28px!important;margin:18px 0 8px!important}
+body:not(.crm-mode) .publishing-route-card p,body:not(.crm-mode) .publishing-route-card li{font-size:15px!important;color:var(--muted)}
+body:not(.crm-mode) .publishing-route-card li svg{color:var(--indigo)}
+body:not(.crm-mode) .publishing-route-card.selected{border-color:var(--indigo)!important;box-shadow:0 0 0 1px var(--indigo)}
+body:not(.crm-mode) .public-three-steps article{border-radius:10px;padding:24px}
+body:not(.crm-mode) .public-three-steps article svg{color:var(--indigo)}
+body:not(.crm-mode) .public-three-steps h3{font-size:17px!important;margin:12px 0 6px}
+body:not(.crm-mode) .public-three-steps p,body:not(.crm-mode) .public-faq p,body:not(.crm-mode) .public-service-list p{font-size:15px!important;line-height:1.65!important}
+body:not(.crm-mode) .public-faq details,body:not(.crm-mode) .public-service-list details{border-radius:8px;padding:16px 18px}
+body:not(.crm-mode) .public-faq summary,body:not(.crm-mode) .public-service-list summary{font-size:15px;font-weight:600}
+body:not(.crm-mode) .public-faq details[open] summary{margin-bottom:8px}
+body:not(.crm-mode) .reader-price{color:var(--ink)}
+
+/* Book page: a clear buy box */
+body:not(.crm-mode) .reader-book-layout{grid-template-columns:minmax(220px,320px) minmax(0,1fr);gap:56px;align-items:start}
+body:not(.crm-mode) .reader-book-layout>aside .public-book-cover{box-shadow:inset 4px 0 6px rgba(0,0,0,.15),0 18px 36px rgba(28,34,48,.2);border-radius:2px 4px 4px 2px}
+body:not(.crm-mode) .reader-book-layout h1{font-size:clamp(34px,3.6vw,46px)!important;margin:6px 0 8px!important}
+body:not(.crm-mode) .reader-author{font-size:16px}
+body:not(.crm-mode) .reader-editions>a{border-radius:8px;font-size:14px;padding:12px 14px}
+body:not(.crm-mode) .reader-editions a.selected{border-color:var(--indigo);background:var(--lavender)}
+body:not(.crm-mode) .reader-price{font:600 30px var(--sans)!important;margin:18px 0 4px!important}
+body:not(.crm-mode) .reader-buy-actions .primary{min-width:180px}
+body:not(.crm-mode) .reader-delivery{border-top:1px solid var(--line)}
+body:not(.crm-mode) .reader-delivery>label,body:not(.crm-mode) .reader-delivery p,body:not(.crm-mode) .reader-assurance{font-size:13px}
+body:not(.crm-mode) .reader-information dl>div{border-radius:8px}
+body:not(.crm-mode) .reader-information dt{font-size:12px}
+body:not(.crm-mode) .reader-information dd{font-size:15px}
+body:not(.crm-mode) .reader-information h2,body:not(.crm-mode) .reader-reviews h2,body:not(.crm-mode) .reader-similar-heading,body:not(.crm-mode) .public-three-steps>h2,body:not(.crm-mode) .public-faq h2{font-size:clamp(26px,2.6vw,34px)!important}
+body:not(.crm-mode) .breadcrumb{font-size:13px}
