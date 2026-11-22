@@ -65,8 +65,10 @@ export async function POST(req:Request){
       }
     })());
 
-    try{if(emailReady(env as any)){const m=freePublishingCode({name,code:accessCode,link:'https://openshelfpress.com/submit'});await sendEmail(env as any,{to:email,subject:m.subject,text:m.text,html:m.html,timeoutMs:8000})}}catch{}
-    await sendMail(staffEmail(),'New free-publishing application: '+name,name+'\n'+email+'\n'+phone+'\n'+city+', '+state+'\nGenre: '+genre+' | Stage: '+stage+'\nCode: '+accessCode);
+    let applicantEmail='not sent: email is not configured';
+    try{if(emailReady(env as any)){const m=freePublishingCode({name,code:accessCode,link:'https://openshelfpress.com/submit'});const r=await sendEmail(env as any,{to:email,subject:m.subject,text:m.text,html:m.html,key:'lead-code-'+id,timeoutMs:12000});applicantEmail=r.ok?'sent':'failed: '+(r.error||'provider error')}}catch(e:any){applicantEmail='failed: '+String(e?.message||e).slice(0,160)}
+    try{await db().prepare("UPDATE records SET data=json_set(data,'$.codeEmail',?,'$.codeEmailAt',?) WHERE id=?").bind(applicantEmail,new Date().toISOString(),id).run()}catch{}
+    await sendMail(staffEmail(),'New free-publishing application: '+name,'Code email to applicant: '+applicantEmail+'\n\n'+name+'\n'+email+'\n'+phone+'\n'+city+', '+state+'\nGenre: '+genre+' | Stage: '+stage+'\nCode: '+accessCode);
     return json({ok:true,code:accessCode});
   }catch(e:any){return json({error:e.message||'Unable to submit your application'},e.status||400)}
 }
