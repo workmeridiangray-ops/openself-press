@@ -43,3 +43,36 @@ export function AboutPage({books}:{books:any[]}){return <main className="sg-abou
 <section className="sg-cta"><div><h2>Have a manuscript ready?</h2><p>Apply for free publishing, or write to us at info@openshelfpress.com.</p></div><div className="sg-cta-actions"><a href="/free-publishing" className="sg-btn sg-btn-light">Apply for free publishing</a><a href="/contact" className="sg-btn sg-btn-ghostlight">Contact the team</a></div></section>
 </main>}
 export function RoyaltyPlanner(){const [values,setValues]=useState<any>({price:'299',cost:'90',fee:'0',share:'50',units:'100'});const ready=Object.values(values).every(v=>v!==''&&Number.isFinite(Number(v)));const amount=ready?Math.max(0,Number(values.price)*(1-Number(values.fee)/100)-Number(values.cost))*Number(values.share)/100:null;return <main className="public-page-body"><p className="eyebrow">PLAN YOUR BOOK</p><h1>Author earnings calculator.</h1><p className="lead">Use your own confirmed costs and commercial terms to explore an estimate.</p><div className="calculator"><section className="panel"><div className="form-grid">{[['price','Retail price (INR)',0,100000],['cost','Production cost per copy (INR)',0,100000],['fee','Channel fee (%)',0,100],['share','Agreed author share (%)',0,100],['units','Copies sold',1,1000000]].map(([key,label,min,max]:any)=><label key={key}>{label}<input aria-label={label} type="number" min={min} max={max} step={key==='units'?1:'0.01'} value={values[key]} onChange={e=>{const raw=e.target.value;setValues({...values,[key]:raw===''?'':Math.max(min,Math.min(max,Number(raw)))})}}/></label>)}</div><p className="muted">No rates are preset. This estimate excludes any taxes, discounts or costs you have not entered.</p></section><section className="panel calculator-result"><p className="eyebrow">PLANNING ESTIMATE</p>{amount===null?<><h2>Enter your figures</h2><p>Results appear after all fields are completed.</p></>:<><h2>{money(amount)}</h2><p>estimated earnings per copy</p><hr/><h3>{money(amount*Number(values.units))}</h3><p>for {Number(values.units).toLocaleString('en-IN')} copies</p></>}<a className="text-link" href="/submit">Start your book<ArrowRight size={16}/></a></section></div></main>}
+
+export function BlogIndex(){
+  const [posts,setPosts]=useState<any[]|null>(null);
+  const [error,setError]=useState('');
+  useEffect(()=>{fetch('/api/blog').then(r=>r.json()).then((d:any)=>{if(d.error)setError(d.error);else setPosts(d.posts||[])}).catch(()=>setError('Could not load posts'))},[]);
+  return <main className="sg-blog-index">
+    <section className="sg-section-head"><p className="sg-pill"><span className="sg-pulse"/>From the desk</p><h1>Notes on publishing, printing and selling books in India.</h1><p className="lead">Guidance for authors on manuscripts, ISBNs, distribution and royalties.</p></section>
+    <section className="sg-blog-grid">
+      {posts===null&&!error&&<p className="muted">Loading posts…</p>}
+      {error&&<p className="muted">{error}</p>}
+      {posts&&!posts.length&&<p className="muted">No posts yet. Check back soon.</p>}
+      {posts&&posts.map(p=><a key={p.id} className="sg-blog-card" href={'/blog/'+p.slug}>
+        {p.coverImage&&<img src={p.coverImage} alt="" loading="lazy"/>}
+        <div><p className="sg-blog-meta">{p.publishedAt?new Date(p.publishedAt).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}):'Draft'}{p.status==='Draft'&&<span className="badge">Draft</span>}</p><h2>{p.title}</h2><p>{p.excerpt}</p></div>
+      </a>)}
+    </section>
+  </main>;
+}
+export function BlogPost({slug}:{slug:string}){
+  const [post,setPost]=useState<any>(null);
+  const [error,setError]=useState('');
+  useEffect(()=>{setPost(null);setError('');fetch('/api/blog?slug='+encodeURIComponent(slug)).then(r=>r.json()).then((d:any)=>{if(d.error)setError(d.error);else setPost(d.post)}).catch(()=>setError('Could not load this post'))},[slug]);
+  if(error)return <main className="content-section page-content narrow"><h1>Post not found</h1><p>{error}</p><a className="text-link" href="/blog">Back to all posts<ArrowRight size={15}/></a></main>;
+  if(!post)return <main className="content-section page-content narrow"><p className="muted">Loading…</p></main>;
+  return <main className="sg-blog-post">
+    <a className="text-link" href="/blog">All posts</a>
+    <p className="sg-blog-meta">{post.publishedAt?new Date(post.publishedAt).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}):'Draft'} · {post.authorName}</p>
+    <h1>{post.title}</h1>
+    {post.coverImage&&<img src={post.coverImage} alt="" className="sg-blog-cover"/>}
+    <div className="sg-blog-body">{String(post.body||'').split(/\n{2,}/).map((para:string,i:number)=><p key={i}>{para}</p>)}</div>
+    {!!post.tags?.length&&<div className="sg-blog-tags">{post.tags.map((t:string)=><span key={t}>{t}</span>)}</div>}
+  </main>;
+}

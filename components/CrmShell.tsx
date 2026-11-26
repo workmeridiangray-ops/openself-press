@@ -89,7 +89,7 @@ export const crmNavGroups=[
   {title:'Publishing',items:['Submissions','Publishing','Files','Cover design','ISBN','Catalogue']},
   {title:'Operations',items:['Production','Shipping','Distribution']},
   {title:'Finance',items:['Accounts','Sales','Royalties','Payouts']},
-  {title:'Marketing',items:['Campaigns','Reviews']},
+  {title:'Marketing',items:['Campaigns','Reviews','Blog']},
   {title:'Support',items:['Support','Services','Notifications']},
   {title:'Setup',items:['Team','Settings']},
 ];
