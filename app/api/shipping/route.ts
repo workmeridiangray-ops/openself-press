@@ -9,5 +9,5 @@ export async function GET(req:Request){try{
   const qty=Math.max(1,Math.min(50,Number(url.searchParams.get('qty'))||1));
   const weightKg=qty*0.3+0.1;
   const result=await shippingRate(pin,weightKg);
-  return reply({ok:true,rate:result.rate,etaDays:result.etaDays});
+  return reply({ok:true,rate:result.rate,etaDays:result.etaDays,courier:result.courier,options:result.options});
 }catch(e:any){return reply({ok:false,error:e.message},200)}}
